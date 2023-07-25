@@ -1,0 +1,3 @@
+[submodule "loo"]
+	path = loo
+	url = https://github.com/Hyiker/loo.git
