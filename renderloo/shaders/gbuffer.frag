@@ -9,11 +9,12 @@ layout(location = 3) in vec3 vTangent;
 layout(location = 4) in vec3 vBitangent;
 
 layout(location = 0) out vec4 FragPosition;
-layout(location = 1) out vec3 FragNormal;
-layout(location = 2) out vec4 FragAlbedo;
-layout(location = 3) out vec4 GBuffer3;
-layout(location = 4) out vec4 GBuffer4;
-layout(location = 5) out vec4 GBuffer5;
+// base color(3) + unused(1)
+layout(location = 1) out vec4 GBufferA;
+// metallic(1) + padding(2) + occlusion(1)
+layout(location = 2) out vec4 GBufferB;
+// normal(3) + roughness(1)
+layout(location = 3) out vec4 GBufferC;
 
 uniform vec3 uCameraPosition;
 
@@ -22,12 +23,10 @@ uniform bool enableParallax;
 #ifdef MATERIAL_PBR
 layout(std140, binding = 3) uniform PBRMetallicMaterial {
     vec4 baseColorMetallic;
-    // transmission(1) + sigmaT(3)
-    vec4 transmissionSigmaT;
-    // sigmaA(3) + roughness(1)
-    vec4 sigmaARoughness;
+    // roughness(1) + padding(3)
+    vec4 roughness;
 }
-simpleMaterial;
+material;
 layout(binding = 10) uniform sampler2D baseColorTex;
 layout(binding = 11) uniform sampler2D occlusionTex;
 layout(binding = 12) uniform sampler2D metallicTex;
@@ -36,20 +35,14 @@ layout(binding = 13) uniform sampler2D roughnessTex;
 void GBufferFromPBRMaterial(in vec2 texCoord, in sampler2D baseColorTex,
                             in sampler2D occlusionTex, in sampler2D metallicTex,
                             in sampler2D roughnessTex, in vec3 baseColor,
-                            in float metallic, in float transmission,
-                            in vec3 sigmaT, in vec3 sigmaA, in float roughness,
-                            out vec4 GBufferAlbedo,
-                            out vec4 GBufferTransmissionSigmaT,
-                            out vec4 GBufferSigmaARoughness,
-                            out vec4 GBufferOcclusion) {
-    GBufferAlbedo.rgb = texture(baseColorTex, texCoord).rgb * baseColor;
-    GBufferAlbedo.a = texture(metallicTex, texCoord).r * metallic;
-    GBufferTransmissionSigmaT.r = transmission;
-    GBufferTransmissionSigmaT.gba = sigmaT;
-    GBufferSigmaARoughness.rgb = sigmaA;
-    GBufferTransmissionSigmaT.gba += GBufferSigmaARoughness.rgb;
-    GBufferSigmaARoughness.a = roughness;
-    GBufferOcclusion.r = texture(occlusionTex, texCoord).r;
+                            in float metallic, in float roughness,
+                            inout vec4 GBufferA, inout vec4 GBufferB,
+                            inout vec4 GBufferC) {
+    GBufferA.rgb = texture(baseColorTex, texCoord).rgb * baseColor;
+    GBufferB.r = length(texture(metallicTex, texCoord).rgb) * metallic;
+    GBufferB.gb = texCoord;
+    GBufferB.a = texture(occlusionTex, texCoord).r;
+    GBufferC.a = length(texture(roughnessTex, texCoord).rgb) * roughness;
 }
 #else
 layout(std140, binding = 2) uniform SimpleMaterial {
@@ -60,7 +53,7 @@ layout(std140, binding = 2) uniform SimpleMaterial {
     vec4 transparentIOR;
     float shininess;
 }
-simpleMaterial;
+material;
 layout(binding = 3) uniform sampler2D ambientTex;
 layout(binding = 4) uniform sampler2D diffuseTex;
 layout(binding = 5) uniform sampler2D specularTex;
@@ -100,19 +93,15 @@ void main() {
     sNormal = length(sNormal) == 0.0 ? vNormal : (TBN * (sNormal * 2.0 - 1.0));
     sNormal = normalize(enableNormal ? sNormal : vNormal);
     FragPosition = vec4(vPos, 1);
-    FragNormal = sNormal;
+    GBufferC.rgb = sNormal;
 #ifdef MATERIAL_PBR
-    GBufferFromPBRMaterial(
-        texCoord, baseColorTex, occlusionTex, metallicTex, roughnessTex,
-        simpleMaterial.baseColorMetallic.rgb,
-        simpleMaterial.baseColorMetallic.a, simpleMaterial.transmissionSigmaT.r,
-        simpleMaterial.transmissionSigmaT.gba,
-        simpleMaterial.sigmaARoughness.rgb, simpleMaterial.sigmaARoughness.a,
-        FragAlbedo, GBuffer3, GBuffer4, GBuffer5);
+    GBufferFromPBRMaterial(texCoord, baseColorTex, occlusionTex, metallicTex,
+                           roughnessTex, material.baseColorMetallic.rgb,
+                           material.baseColorMetallic.a, material.roughness.r,
+                           GBufferA, GBufferB, GBufferC);
 #else
-    GBufferFromSimpleMaterial(
-        texCoord, diffuseTex, specularTex, simpleMaterial.diffuse.rgb,
-        simpleMaterial.specular.rgb, simpleMaterial.transparentIOR, FragAlbedo,
-        GBuffer3);
+    GBufferFromSimpleMaterial(texCoord, diffuseTex, specularTex,
+                              material.diffuse.rgb, material.specular.rgb,
+                              material.transparentIOR, FragAlbedo, GBuffer3);
 #endif
 }

@@ -5,6 +5,7 @@ includes("spv2hpp")
 target("renderloo_lib")
     set_kind("static")
     add_deps("loo", "spv2hpp")
+    set_symbols("debug")
 
     add_includedirs("include", {public = true})
     set_languages("c11", "cxx17")

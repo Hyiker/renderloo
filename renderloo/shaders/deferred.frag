@@ -4,12 +4,13 @@
 #include "include/lighting.glsl"
 
 layout(binding = 0) uniform sampler2D GBufferPosition;
-layout(binding = 1) uniform sampler2D GBufferNormal;
-layout(binding = 2) uniform sampler2D GBufferAlbedo;
-layout(binding = 3) uniform sampler2D GBuffer3;
-layout(binding = 4) uniform sampler2D GBuffer4;
-layout(binding = 5) uniform sampler2D GBuffer5;
-layout(binding = 6) uniform sampler2D MainLightShadowMap;
+// base color(3) + unused(1)
+layout(binding = 1) uniform sampler2D GBufferA;
+// metallic(1) + padding(2) + occlusion(1)
+layout(binding = 2) uniform sampler2D GBufferB;
+// normal(3) + roughness(1)
+layout(binding = 3) uniform sampler2D GBufferC;
+layout(binding = 4) uniform sampler2D MainLightShadowMap;
 
 uniform mat4 mainLightMatrix;
 uniform vec3 cameraPosition;
@@ -27,18 +28,16 @@ void main() {
     vec3 positionWS;
     vec3 normalWS;
     // diffuse(rgb) + specular(a)
-    vec4 albedo;
-    vec3 transparent;
-    float ior;
+    vec3 baseColor;
+    float metallic;
     float occlusion;
     float roughness;
     positionWS = texture(GBufferPosition, texCoord).xyz;
-    normalWS = texture(GBufferNormal, texCoord).xyz;
-    albedo = texture(GBufferAlbedo, texCoord).rgba;
-    transparent = texture(GBuffer3, texCoord).rgb;
-    ior = texture(GBuffer3, texCoord).a;
-    roughness = texture(GBuffer4, texCoord).a;
-    occlusion = texture(GBuffer5, texCoord).r;
+    normalWS = texture(GBufferC, texCoord).xyz;
+    baseColor = texture(GBufferA, texCoord).rgb;
+    metallic = texture(GBufferB, texCoord).r;
+    roughness = texture(GBufferC, texCoord).a;
+    occlusion = texture(GBufferB, texCoord).a;
 
     vec3 V = normalize(cameraPosition - positionWS);
     vec3 diffuse = vec3(0.0), specular = vec3(0.0);
@@ -55,20 +54,21 @@ void main() {
         }
         float intensity = light.intensity / (distance * distance);
         float shadow =
-            computeShadow(mainLightMatrix, MainLightShadowMap, positionWS);
+            computeShadow(mainLightMatrix, MainLightShadowMap, positionWS) *
+            0.0;
         vec3 diff, spec;
 #ifdef MATERIAL_PBR
         SurfaceParamsPBRMetallicRoughness surface;
         surface.viewDirection = V;
         surface.normal = normalize(normalWS);
-        surface.baseColor = albedo.rgb;
-        surface.metallic = albedo.a;
+        surface.baseColor = baseColor;
+        surface.metallic = metallic;
         surface.roughness = roughness;
         computePBRMetallicRoughnessLocalLighting(surface, light, V, L,
                                                  intensity, diff, spec);
 #else
         SurfaceParamsBlinnPhong params;
-        params.albedo = albedo;
+        params.baseColor = baseColor;
         params.shininess = 20.0;
         params.normal = normalWS;
         computeBlinnPhongLocalLighting(params, light, V, L, intensity, diff,

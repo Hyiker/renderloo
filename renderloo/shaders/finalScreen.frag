@@ -19,6 +19,6 @@ void main() {
     vec3 skyboxTexture = texture(skyboxTexture, texCoord).rgb;
     vec3 color = specular + diffuse;
     color += skyboxTexture;
-    // color = gammaCorrection(color);
+    color = gammaCorrection(color);
     FragColor = vec4(color, 1.0);
 }

@@ -12,23 +12,24 @@
 #include <loo/Quad.hpp>
 #include <loo/Scene.hpp>
 #include <loo/Shader.hpp>
-#include <loo/Skybox.hpp>
 #include <loo/UniformBuffer.hpp>
 #include <loo/loo.hpp>
 #include <memory>
 #include <string>
 #include <vector>
 #include "core/Light.hpp"
+#include "core/Skybox.hpp"
 
 #include "core/FinalProcess.hpp"
 #include "core/constants.hpp"
 
 class RenderLoo : public loo::Application {
    public:
-    RenderLoo(int width, int height, const char* skyBoxPrefix = nullptr);
+    RenderLoo(int width, int height);
     // only load model
     void loadModel(const std::string& filename);
     void loadGLTF(const std::string& filename);
+    void loadSkybox(const std::string& filename);
     loo::Camera& getCamera() { return m_maincam; }
     void afterCleanup() override;
     void convertMaterial();
@@ -56,10 +57,9 @@ class RenderLoo : public loo::Application {
     void mouse();
     void saveScreenshot(std::filesystem::path filename) const;
 
-    loo::ShaderProgram m_baseshader, m_skyboxshader;
+    loo::ShaderProgram m_baseshader;
     loo::Scene m_scene;
-    std::shared_ptr<loo::TextureCubeMap> m_skyboxtex{};
-    loo::Skybox m_skybox;
+    Skybox m_skybox;
     loo::Camera m_maincam;
     std::vector<ShaderLight> m_lights;
 
@@ -69,20 +69,13 @@ class RenderLoo : public loo::Application {
 
     // gbuffer
     struct GBuffer {
-        std::shared_ptr<loo::Texture2D> position;
-        std::shared_ptr<loo::Texture2D> normal;
-        // blinn-phong: diffuse(3) + specular(1)
-        // pbr metallic-roughness: baseColor(3) + metallic(1)
-        std::shared_ptr<loo::Texture2D> albedo;
-        // simple material: transparent(3)(sss mask) + IOR(1)
-        // pbr: transmission(1)(sss mask) + sigma_t(3)
-        std::shared_ptr<loo::Texture2D> buffer3;
-        // simple material: unused
-        // pbr: sigma_a(3) + roughness(1)
-        std::unique_ptr<loo::Texture2D> buffer4;
-        // simple material: unused
-        // pbr: occlusion(1) + unused(3)
-        std::unique_ptr<loo::Texture2D> buffer5;
+        std::unique_ptr<loo::Texture2D> position;
+        // base color(3) + unused(1)
+        std::unique_ptr<loo::Texture2D> bufferA;
+        // metallic(1) + padding(2) + occlusion(1)
+        std::unique_ptr<loo::Texture2D> bufferB;
+        // normal(3) + roughness(1)
+        std::unique_ptr<loo::Texture2D> bufferC;
         loo::Renderbuffer depthrb;
     } m_gbuffers;
     loo::Framebuffer m_gbufferfb;

@@ -9,7 +9,6 @@
 #include <nlohmann/json.hpp>
 #include <string>
 #include "core/RenderLoo.hpp"
-#include "glm/trigonometric.hpp"
 #define GLM_ENABLE_EXPERIMENTAL
 #include "glm/gtx/string_cast.hpp"
 
@@ -47,18 +46,13 @@ void loadScene(RenderLoo& app, const char* filename) {
 int main(int argc, char* argv[]) {
     loo::initialize(argv[0]);
 
-    argparse::ArgumentParser program("HDSSS");
+    argparse::ArgumentParser program("LooRender");
     program.add_argument("-m", "--model").help("Model file path");
-    program.add_argument("-s", "--scaling")
-        .default_value(1.0f)
-        .help("Scaling factor of the model")
-        .scan<'g', float>();
     program.add_argument("-b", "--skybox")
         .help(
             "Skybox directory, name the six faces as "
             "[front|back|left|right|top|bottom].jpg");
 
-    program.add_argument("-c", "--config").help("JSON config file path");
     try {
         program.parse_args(argc, argv);
     } catch (const std::runtime_error& err) {
@@ -66,7 +60,6 @@ int main(int argc, char* argv[]) {
         std::cout << program;
         exit(1);
     }
-    float scaling = program.get<float>("--scaling");
 
     string modelPath, skyboxDir;
 
@@ -78,8 +71,10 @@ int main(int argc, char* argv[]) {
         skyboxDir = *path;
     }
 
-    RenderLoo app(1920, 1080,
-                  skyboxDir.length() == 0 ? nullptr : skyboxDir.c_str());
+    RenderLoo app(1920, 1080);
     loadScene(app, modelPath.c_str());
+    if (!skyboxDir.empty()) {
+        app.loadSkybox(skyboxDir);
+    }
     app.run();
 }

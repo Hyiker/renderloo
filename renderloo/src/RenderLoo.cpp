@@ -26,8 +26,6 @@
 #include "shaders/gbuffer.vert.hpp"
 #include "shaders/shadowmap.frag.hpp"
 #include "shaders/shadowmap.vert.hpp"
-#include "shaders/skybox.frag.hpp"
-#include "shaders/skybox.vert.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/ext.hpp>
@@ -94,14 +92,16 @@ void RenderLoo::loadGLTF(const std::string& filename) {
     LOG(INFO) << "Load done" << endl;
 }
 
-RenderLoo::RenderLoo(int width, int height, const char* skyBoxPrefix)
+void RenderLoo::loadSkybox(const std::string& filename) {
+    m_skybox.loadTexture(filename);
+}
+
+RenderLoo::RenderLoo(int width, int height)
     : Application(width, height, "High distance subsurface scattering"),
       m_baseshader{Shader(GBUFFER_VERT, ShaderType::Vertex),
                    Shader(GBUFFER_FRAG, ShaderType::Fragment)},
-      m_skyboxshader{Shader(SKYBOX_VERT, ShaderType::Vertex),
-                     Shader(SKYBOX_FRAG, ShaderType::Fragment)},
       m_scene(),
-      m_maincam(vec3(0, 0, -0.15), vec3(0, 0, 0), glm::radians(45.f), 0.01,
+      m_maincam(vec3(0, 0, 0.15), vec3(0, 0, 0), glm::radians(45.f), 0.01,
                 100.0),
       m_shadowmapshader{Shader(SHADOWMAP_VERT, ShaderType::Vertex),
                         Shader(SHADOWMAP_FRAG, ShaderType::Fragment)},
@@ -109,21 +109,8 @@ RenderLoo::RenderLoo(int width, int height, const char* skyBoxPrefix)
                        Shader(DEFERRED_FRAG, ShaderType::Fragment)},
 
       m_finalprocess(getWidth(), getHeight()) {
-    if (skyBoxPrefix) {
-        // skybox setup
-        auto skyboxFilenames = TextureCubeMap::builder()
-                                   .front("front")
-                                   .back("back")
-                                   .left("left")
-                                   .right("right")
-                                   .top("top")
-                                   .bottom("bottom")
-                                   .prefix(skyBoxPrefix)
-                                   .build();
-        m_skyboxtex = createTextureCubeMapFromFiles(
-            skyboxFilenames,
-            TEXTURE_OPTION_CONVERT_TO_LINEAR | TEXTURE_OPTION_MIPMAP);
-    }
+
+    PBRMetallicMaterial::init();
 
     initGBuffers();
     initShadowMap();
@@ -153,47 +140,38 @@ void RenderLoo::initGBuffers() {
 
     int mipmapLevel = mipmapLevelFromSize(getWidth(), getHeight());
 
-    m_gbuffers.position = make_shared<Texture2D>();
+    m_gbuffers.position = make_unique<Texture2D>();
     m_gbuffers.position->init();
-    m_gbuffers.position->setupStorage(getWidth(), getHeight(), GL_RGBA32F, 1);
-    m_gbuffers.position->setSizeFilter(GL_NEAREST, GL_NEAREST);
+    m_gbuffers.position->setupStorage(getWidth(), getHeight(), GL_RGBA32F,
+                                      mipmapLevel);
+    m_gbuffers.position->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
 
-    m_gbuffers.normal = make_shared<Texture2D>();
-    m_gbuffers.normal->init();
-    m_gbuffers.normal->setupStorage(getWidth(), getHeight(), GL_RGB16F,
-                                    mipmapLevel);
-    m_gbuffers.normal->setSizeFilter(GL_NEAREST, GL_NEAREST);
+    m_gbuffers.bufferA = make_unique<Texture2D>();
+    m_gbuffers.bufferA->init();
+    m_gbuffers.bufferA->setupStorage(getWidth(), getHeight(), GL_RGBA32F,
+                                     mipmapLevel);
+    m_gbuffers.bufferA->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
 
-    m_gbuffers.albedo = make_shared<Texture2D>();
-    m_gbuffers.albedo->init();
-    m_gbuffers.albedo->setupStorage(getWidth(), getHeight(), GL_RGBA32F, 1);
-    m_gbuffers.albedo->setSizeFilter(GL_LINEAR, GL_LINEAR);
+    m_gbuffers.bufferB = make_unique<Texture2D>();
+    m_gbuffers.bufferB->init();
+    m_gbuffers.bufferB->setupStorage(getWidth(), getHeight(), GL_RGBA32F,
+                                     mipmapLevel);
+    m_gbuffers.bufferB->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
 
-    m_gbuffers.buffer3 = make_shared<Texture2D>();
-    m_gbuffers.buffer3->init();
-    m_gbuffers.buffer3->setupStorage(getWidth(), getHeight(), GL_RGBA32F, 1);
-    m_gbuffers.buffer3->setSizeFilter(GL_NEAREST, GL_NEAREST);
-
-    m_gbuffers.buffer4 = make_unique<Texture2D>();
-    m_gbuffers.buffer4->init();
-    m_gbuffers.buffer4->setupStorage(getWidth(), getHeight(), GL_RGBA16F, 1);
-    m_gbuffers.buffer4->setSizeFilter(GL_NEAREST, GL_NEAREST);
-
-    m_gbuffers.buffer5 = make_unique<Texture2D>();
-    m_gbuffers.buffer5->init();
-    m_gbuffers.buffer5->setupStorage(getWidth(), getHeight(), GL_RGBA16F, 1);
-    m_gbuffers.buffer5->setSizeFilter(GL_NEAREST, GL_NEAREST);
+    m_gbuffers.bufferC = make_unique<Texture2D>();
+    m_gbuffers.bufferC->init();
+    m_gbuffers.bufferC->setupStorage(getWidth(), getHeight(), GL_RGBA32F,
+                                     mipmapLevel);
+    m_gbuffers.bufferC->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
 
     panicPossibleGLError();
 
     m_gbuffers.depthrb.init(GL_DEPTH_COMPONENT32, getWidth(), getHeight());
 
     m_gbufferfb.attachTexture(*m_gbuffers.position, GL_COLOR_ATTACHMENT0, 0);
-    m_gbufferfb.attachTexture(*m_gbuffers.normal, GL_COLOR_ATTACHMENT1, 0);
-    m_gbufferfb.attachTexture(*m_gbuffers.albedo, GL_COLOR_ATTACHMENT2, 0);
-    m_gbufferfb.attachTexture(*m_gbuffers.buffer3, GL_COLOR_ATTACHMENT3, 0);
-    m_gbufferfb.attachTexture(*m_gbuffers.buffer4, GL_COLOR_ATTACHMENT4, 0);
-    m_gbufferfb.attachTexture(*m_gbuffers.buffer5, GL_COLOR_ATTACHMENT5, 0);
+    m_gbufferfb.attachTexture(*m_gbuffers.bufferA, GL_COLOR_ATTACHMENT1, 0);
+    m_gbufferfb.attachTexture(*m_gbuffers.bufferB, GL_COLOR_ATTACHMENT2, 0);
+    m_gbufferfb.attachTexture(*m_gbuffers.bufferC, GL_COLOR_ATTACHMENT3, 0);
     m_gbufferfb.attachRenderbuffer(m_gbuffers.depthrb, GL_DEPTH_ATTACHMENT);
 }
 
@@ -322,8 +300,8 @@ void RenderLoo::gui() {
         float h_img = h * 0.2,
               w_img = h_img / io.DisplaySize.y * io.DisplaySize.x;
         ImGui::SetNextWindowBgAlpha(1.0f);
-        vector<GLuint> textures{m_gbuffers.albedo->getId(),
-                                m_gbuffers.normal->getId()};
+        vector<GLuint> textures{m_gbuffers.bufferA->getId(),
+                                m_gbuffers.bufferC->getId()};
         ImGui::SetNextWindowSize(ImVec2(w_img * textures.size() + 40, h_img));
         ImGui::SetNextWindowPos(ImVec2(0, h * 0.8), ImGuiCond_Always);
         if (ImGui::Begin("Textures", nullptr,
@@ -339,7 +317,7 @@ void RenderLoo::gui() {
 
 void RenderLoo::finalScreenPass() {
     m_finalprocess.render(*m_diffuseresult, *m_specularresult,
-                          *m_gbuffers.buffer3, *m_skyboxresult,
+                          *m_gbuffers.bufferB, *m_skyboxresult,
                           m_finalpassoptions);
 }
 
@@ -367,14 +345,7 @@ void RenderLoo::skyboxPass() {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glm::mat4 view;
     m_maincam.getViewMatrix(view);
-    m_skyboxshader.use();
-    ShaderProgram::getUniformBlock(SHADER_UB_PORT_MVP)
-        .mapBufferScoped<MVP>(
-            [&](MVP& mvp) { mvp.view = glm::mat4(glm::mat3(view)); });
-    m_skyboxshader.setTexture(
-        SHADER_SAMPLER_PORT_SKYBOX,
-        m_skyboxtex ? *m_skyboxtex : TextureCubeMap::getBlackTexture());
-    m_skybox.draw();
+    m_skybox.draw(view);
     glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
 }
@@ -383,8 +354,7 @@ void RenderLoo::gbufferPass() {
     m_gbufferfb.bind();
 
     m_gbufferfb.enableAttachments({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
-                                   GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3,
-                                   GL_COLOR_ATTACHMENT4});
+                                   GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3});
 
     clear();
 
@@ -431,12 +401,10 @@ void RenderLoo::deferredPass() {
 
     m_deferredshader.use();
     m_deferredshader.setTexture(0, *m_gbuffers.position);
-    m_deferredshader.setTexture(1, *m_gbuffers.normal);
-    m_deferredshader.setTexture(2, *m_gbuffers.albedo);
-    m_deferredshader.setTexture(3, *m_gbuffers.buffer3);
-    m_deferredshader.setTexture(4, *m_gbuffers.buffer4);
-    m_deferredshader.setTexture(5, *m_gbuffers.buffer5);
-    m_deferredshader.setTexture(6, *m_mainlightshadowmap);
+    m_deferredshader.setTexture(1, *m_gbuffers.bufferA);
+    m_deferredshader.setTexture(2, *m_gbuffers.bufferB);
+    m_deferredshader.setTexture(3, *m_gbuffers.bufferC);
+    m_deferredshader.setTexture(4, *m_mainlightshadowmap);
     m_deferredshader.setUniform("mainLightMatrix",
                                 m_lights[0].getLightSpaceMatrix());
 
