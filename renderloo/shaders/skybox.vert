@@ -7,6 +7,7 @@ layout(std140, binding = 0) uniform MVPMatrices {
     mat4 model;
     mat4 view;
     mat4 projection;
+    mat4 normalMatrix;
 }
 mvp;
 

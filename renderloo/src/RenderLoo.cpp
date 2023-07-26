@@ -300,8 +300,7 @@ void RenderLoo::gui() {
         float h_img = h * 0.2,
               w_img = h_img / io.DisplaySize.y * io.DisplaySize.x;
         ImGui::SetNextWindowBgAlpha(1.0f);
-        vector<GLuint> textures{m_gbuffers.bufferA->getId(),
-                                m_gbuffers.bufferC->getId()};
+        vector<GLuint> textures{};
         ImGui::SetNextWindowSize(ImVec2(w_img * textures.size() + 40, h_img));
         ImGui::SetNextWindowPos(ImVec2(0, h * 0.8), ImGuiCond_Always);
         if (ImGui::Begin("Textures", nullptr,
@@ -484,6 +483,7 @@ void RenderLoo::loop() {
     // render
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
+    glViewport(0, 0, getWidth(), getHeight());
 
     {
         gbufferPass();
