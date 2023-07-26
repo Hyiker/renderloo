@@ -1,6 +1,6 @@
-#include "SimpleMaterial.hpp"
+#include "core/SimpleMaterial.hpp"
 #include <glog/logging.h>
-#include "constants.hpp"
+#include "core/constants.hpp"
 #include "loo/Material.hpp"
 
 #include <memory>

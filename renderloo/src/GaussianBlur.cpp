@@ -1,4 +1,4 @@
-#include "GaussianBlur.hpp"
+#include "core/GaussianBlur.hpp"
 
 #include "shaders/gaussianblur.frag.hpp"
 #include "shaders/gaussianblur.vert.hpp"

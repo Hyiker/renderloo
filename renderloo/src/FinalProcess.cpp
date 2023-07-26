@@ -1,6 +1,6 @@
-#ifndef HDSSS_SRC_FINAL_PROCESS_HPP
-#define HDSSS_SRC_FINAL_PROCESS_HPP
-#include "FinalProcess.hpp"
+#ifndef RENDERLOO_SRC_FINAL_PROCESS_HPP
+#define RENDERLOO_SRC_FINAL_PROCESS_HPP
+#include "core/FinalProcess.hpp"
 
 #include <loo/glError.hpp>
 
@@ -19,8 +19,6 @@ void FinalProcess::init() {
 }
 void FinalProcess::render(const loo::Texture2D& diffuseTexture,
                           const loo::Texture2D& specularTexture,
-                          const loo::Texture2D& translucencyTexture,
-                          const loo::Texture2D& sssTexture,
                           const loo::Texture2D& GBuffer3,
                           const loo::Texture2D& skyboxTexture,
                           const FinalPassOptions& options) {
@@ -31,16 +29,8 @@ void FinalProcess::render(const loo::Texture2D& diffuseTexture,
     // force fill the quad in the final step
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     m_shader.use();
-    m_shader.setUniform("directOutput", options.directOutput);
-    m_shader.setUniform("enableDiffuse", options.diffuse);
-    m_shader.setUniform("enableSpecular", options.specular);
-    m_shader.setUniform("enableTranslucency", options.translucency);
-    m_shader.setUniform("enableSSS", options.SSS);
-    m_shader.setUniform("SSSStrength", options.SSSStrength);
     m_shader.setTexture(0, diffuseTexture);
     m_shader.setTexture(1, specularTexture);
-    m_shader.setTexture(2, translucencyTexture);
-    m_shader.setTexture(3, sssTexture);
     m_shader.setTexture(4, skyboxTexture);
     m_shader.setTexture(5, GBuffer3);
 
@@ -49,4 +39,4 @@ void FinalProcess::render(const loo::Texture2D& diffuseTexture,
     logPossibleGLError();
 }
 
-#endif /* HDSSS_SRC_FINAL_PROCESS_HPP */
+#endif /* RENDERLOO_SRC_FINAL_PROCESS_HPP */

@@ -1,5 +1,5 @@
-#ifndef HDSSS_INCLUDE_PBRMATERIALS_HPP
-#define HDSSS_INCLUDE_PBRMATERIALS_HPP
+#ifndef RENDERLOO_INCLUDE_CORE_PBRMATERIALS_HPP
+#define RENDERLOO_INCLUDE_CORE_PBRMATERIALS_HPP
 
 #include <glog/logging.h>
 #include <filesystem>
@@ -65,4 +65,4 @@ class PBRMetallicMaterial : public loo::Material {
 std::shared_ptr<PBRMetallicMaterial> convertPBRMetallicMaterialFromBaseMaterial(
     const loo::BaseMaterial& baseMaterial);
 
-#endif /* HDSSS_INCLUDE_PBRMATERIALS_HPP */
+#endif /* RENDERLOO_INCLUDE_CORE_PBRMATERIALS_HPP */

@@ -11,7 +11,6 @@ target("renderloo_lib")
     set_rules("glsl2hpp", {outputdir = path.join(os.scriptdir(), "include", "shaders"), defines = {"MATERIAL_PBR"}})
     add_files("shaders/*.*", "src/*.cpp")
     remove_files("src/main.cpp")
-    
 
     add_defines("_CRT_SECURE_NO_WARNINGS")
     set_policy("build.warning", true)

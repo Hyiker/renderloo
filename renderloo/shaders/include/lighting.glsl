@@ -108,10 +108,8 @@ void computePBRMetallicRoughnessLocalLighting(
     float NdotL = max(0.0, dot(N, L));
     vec3 kD = (1.0 - F) * (1.0 - surface.metallic);
     vec3 radiance = light.color.rgb * intensity;
-    // diffuse = kD * baseColor * radiance * NdotL * PI_INV;
-    diffuse = PBRDiffuseStrength(surface, light, L) * radiance * NdotL * PI_INV;
-    // specular = PBRCookTorranceBRDF(surface, light, L) * radiance;
-    specular = SpecularStrength(N, surface.roughness, L, H) * radiance * 0.02;
+    diffuse = kD * baseColor * radiance * NdotL * PI_INV;
+    specular = PBRCookTorranceBRDF(surface, light, L) * radiance * NdotL;
 }
 
 void computeBlinnPhongLocalLighting(in SurfaceParamsBlinnPhong surfaceParams,

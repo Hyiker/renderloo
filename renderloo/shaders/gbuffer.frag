@@ -19,10 +19,6 @@ uniform vec3 uCameraPosition;
 
 uniform bool enableNormal;
 uniform bool enableParallax;
-uniform bool enableLodVisualize;
-uniform int meshLod;
-uniform bool applySSS;
-const float ambientIntensity = 0.01f;
 #ifdef MATERIAL_PBR
 layout(std140, binding = 3) uniform PBRMetallicMaterial {
     vec4 baseColorMetallic;
@@ -93,22 +89,7 @@ layout(binding = 7) uniform sampler2D normalTex;
 // }
 
 void main() {
-    if (enableLodVisualize) {
-        switch (meshLod) {
-            case 0:
-                FragAlbedo.rgb = vec3(0.50, 0, 0.15);
-                break;
-            case 1:
-                FragAlbedo.rgb = vec3(1, 0.31, 0.16);
-                break;
-            case 2:
-                FragAlbedo.rgb = vec3(1, 1, 0.8);
-                break;
-        }
-        return;
-    }
 
-    vec3 V = normalize(uCameraPosition - vPos);
     vec3 color = vec3(0);
     mat3 TBN =
         mat3(normalize(vTangent), normalize(vBitangent), normalize(vNormal));
@@ -118,19 +99,6 @@ void main() {
     vec3 sNormal = texture(normalTex, texCoord).rgb;
     sNormal = length(sNormal) == 0.0 ? vNormal : (TBN * (sNormal * 2.0 - 1.0));
     sNormal = normalize(enableNormal ? sNormal : vNormal);
-    float opacity = texture(
-#ifdef MATERIAL_PBR
-                        baseColorTex
-#else
-                        diffuseTex
-#endif
-                        ,
-                        texCoord)
-                        .a;
-    if (opacity == 0.0) {
-        // just discard all transparent fragments
-        discard;
-    }
     FragPosition = vec4(vPos, 1);
     FragNormal = sNormal;
 #ifdef MATERIAL_PBR

@@ -1,7 +1,7 @@
-#include "PBRMaterials.hpp"
+#include "core/PBRMaterials.hpp"
 #include <glog/logging.h>
-#include "constants.hpp"
-#include "loo/Material.hpp"
+#include <loo/Material.hpp>
+#include "core/constants.hpp"
 
 #include <memory>
 #include <string>
