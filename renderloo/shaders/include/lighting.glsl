@@ -33,7 +33,7 @@ struct SurfaceParamsPBRMetallicRoughness {
 };
 
 const int LIGHT_TYPE_SPOT = 0, LIGHT_TYPE_POINT = 1, LIGHT_TYPE_DIRECTIONAL = 2;
-
+float DistributionGGX(float NdotH, float a);
 float DistributionGGX(in vec3 N, in float roughness, in vec3 H) {
     float a = roughness * roughness;
     float a2 = a * a;
@@ -45,6 +45,36 @@ float DistributionGGX(in vec3 N, in float roughness, in vec3 H) {
     denom = PI * denom * denom;
 
     return nom / denom;
+}
+
+float DistributionGGX(float NdotH, float a) {
+    float a2 = a * a;
+    float NdotH2 = NdotH * NdotH;
+
+    float denom = NdotH2 * (a2 - 1.0) + 1.0;
+    denom = PI * denom * denom;
+
+    return a2 / denom;
+}
+
+vec3 ImportanceSampleGGXHalfVec(vec2 Xi, float roughness) {
+    float a = roughness * roughness;
+
+    float phi = 2.0 * PI * Xi.x;
+    float cosTheta = sqrt((1.0 - Xi.y) / (1.0 + (a * a - 1.0) * Xi.y));
+    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+
+    // from spherical coordinates to cartesian coordinates
+    vec3 H;
+    H.x = cos(phi) * sinTheta;
+    H.y = sin(phi) * sinTheta;
+    H.z = cosTheta;
+
+    return H;
+}
+
+float GGXHalfVecPdf(float NdotH, float HdotV, float roughness) {
+    return DistributionGGX(NdotH, roughness) * NdotH / (4.0 * HdotV);
 }
 
 vec3 FresnelSchlickApprox(in vec3 F0, in vec3 V, in vec3 H) {
@@ -61,6 +91,16 @@ float SchlickGGXGeometry(in float roughness, in vec3 L, in vec3 V, in vec3 N) {
     float alpha = (roughness + 1) * 0.5;
     alpha *= alpha;
     float k = alpha / 2.0;
+    float VoN = max(0.001, dot(V, N));
+    float LoN = max(0.001, dot(L, N));
+    float G1V = VoN / (VoN * (1.0 - k) + k);
+    float G1L = LoN / (LoN * (1.0 - k) + k);
+    return G1V * G1L;
+}
+
+float SchlickGGXGeometryIBL(in float roughness, in vec3 L, in vec3 V,
+                            in vec3 N) {
+    float k = roughness * roughness * 0.5;
     float VoN = max(0.001, dot(V, N));
     float LoN = max(0.001, dot(L, N));
     float G1V = VoN / (VoN * (1.0 - k) + k);
@@ -117,9 +157,9 @@ void computePBRMetallicRoughnessLocalLighting(
     specular = PBRCookTorranceBRDF(surface, light, L) * radiance * NdotL;
 }
 
-void computePBRMetallicRoughnessIBL(
+vec3 computePBRMetallicRoughnessIBLDiffuse(
     in SurfaceParamsPBRMetallicRoughness surface,
-    in samplerCube diffuseConvolved, in vec3 V, out vec3 diffuse) {
+    in samplerCube diffuseConvolved, in vec3 V) {
     vec3 N = surface.normal;
     float NdotV = max(dot(N, V), 0.0);
     vec3 baseColor = surface.baseColor;
@@ -130,7 +170,26 @@ void computePBRMetallicRoughnessIBL(
     vec3 kD = (1.0 - F) * (1.0 - surface.metallic);
     // diffuse irradiance has already been divided by PI, no need to do it here
     vec3 diffuseIrradiance = texture(diffuseConvolved, N).rgb;
-    diffuse = kD * baseColor * diffuseIrradiance;
+    return kD * baseColor * diffuseIrradiance;
+}
+
+vec3 computePBRMetallicRoughnessIBLSpecular(
+    in SurfaceParamsPBRMetallicRoughness surface,
+    in samplerCube specularConvolved, in sampler2D BRDFPrecomputed, in vec3 V) {
+    vec3 N = surface.normal;
+    float NdotV = max(dot(N, V), 0.0);
+    float roughness = surface.roughness;
+    vec2 brdfScaleBias = texture(BRDFPrecomputed, vec2(NdotV, roughness)).rg;
+    vec3 baseColor = surface.baseColor;
+
+    vec3 F0 = mix(vec3(0.04), baseColor, surface.metallic);
+
+    float mipLevel =
+        float(textureQueryLevels(specularConvolved) - 1.0) * roughness;
+    // diffuse irradiance has already been divided by PI, no need to do it here
+    vec3 specularIrradiance =
+        textureLod(specularConvolved, reflect(-V, N), mipLevel).rgb;
+    return specularIrradiance * (F0 * brdfScaleBias.r + brdfScaleBias.g);
 }
 
 void computeBlinnPhongLocalLighting(in SurfaceParamsBlinnPhong surfaceParams,

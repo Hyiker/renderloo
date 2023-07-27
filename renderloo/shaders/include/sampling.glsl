@@ -147,7 +147,9 @@ vec4 textureCubic(sampler2D sampler, vec2 texCoords, int mode) {
     return c;
 }
 // modified from https://www.shadertoy.com/view/4lscWj
+#ifndef PI
 #define PI 3.1415926535897932384626433832795
+#endif
 vec2 Hammersley(float i, float numSamples) {
     uint b = uint(i);
 

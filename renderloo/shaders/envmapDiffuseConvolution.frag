@@ -22,7 +22,7 @@ void main() {
         float pdf = 0.0;
         vec3 dirLocal = SampleHemisphereCosineWeighted(i, N_SAMPLES, pdf);
         vec3 dirWorld = TBN * dirLocal;
-        irradiance += texture(envMap, dirWorld).rgb * dirLocal.z / pdf;
+        irradiance += textureLod(envMap, dirWorld, 0.0).rgb * dirLocal.z / pdf;
     }
     FragColor = irradiance / float(N_SAMPLES) * PI_INV;
 }

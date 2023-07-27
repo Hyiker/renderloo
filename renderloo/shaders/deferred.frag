@@ -12,6 +12,8 @@ layout(binding = 2) uniform sampler2D GBufferB;
 layout(binding = 3) uniform sampler2D GBufferC;
 layout(binding = 4) uniform sampler2D MainLightShadowMap;
 layout(binding = 5) uniform samplerCube DiffuseConvolved;
+layout(binding = 6) uniform samplerCube SpecularConvolved;
+layout(binding = 7) uniform sampler2D BRDFLUT;
 
 uniform mat4 mainLightMatrix;
 uniform vec3 cameraPosition;
@@ -24,7 +26,6 @@ layout(std140, binding = 1) uniform LightBlock {
     ShaderLight lights[12];
     int nLights;
 };
-
 void main() {
     vec3 positionWS;
     vec3 normalWS;
@@ -39,6 +40,9 @@ void main() {
     metallic = texture(GBufferB, texCoord).r;
     roughness = texture(GBufferC, texCoord).a;
     occlusion = texture(GBufferB, texCoord).a;
+    if (length(normalWS) < 1e-5) {
+        return;
+    }
 
     vec3 V = normalize(cameraPosition - positionWS);
     vec3 diffuse = vec3(0.0), specular = vec3(0.0);
@@ -70,8 +74,11 @@ void main() {
         specular += spec * (1.0 - shadow);
     }
     // compute environment lighting
-    vec3 envDiffuse;
-    computePBRMetallicRoughnessIBL(surface, DiffuseConvolved, V, envDiffuse);
-    DiffuseResult = envDiffuse;
-    SpecularResult = vec3(0.0);
+    vec3 envDiffuse, envSpecular;
+    envDiffuse =
+        computePBRMetallicRoughnessIBLDiffuse(surface, DiffuseConvolved, V);
+    envSpecular = computePBRMetallicRoughnessIBLSpecular(
+        surface, SpecularConvolved, BRDFLUT, V);
+    DiffuseResult = envDiffuse + diffuse;
+    SpecularResult = envSpecular + specular;
 }

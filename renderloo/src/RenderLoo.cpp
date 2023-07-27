@@ -97,7 +97,7 @@ void RenderLoo::loadSkybox(const std::string& filename) {
 }
 
 RenderLoo::RenderLoo(int width, int height)
-    : Application(width, height, "High distance subsurface scattering"),
+    : Application(width, height, "RenderLoo"),
       m_baseshader{Shader(GBUFFER_VERT, ShaderType::Vertex),
                    Shader(GBUFFER_FRAG, ShaderType::Fragment)},
       m_scene(),
@@ -166,7 +166,7 @@ void RenderLoo::initGBuffers() {
 
     panicPossibleGLError();
 
-    m_gbuffers.depthrb.init(GL_DEPTH_COMPONENT32, getWidth(), getHeight());
+    m_gbuffers.depthrb.init(GL_DEPTH24_STENCIL8, getWidth(), getHeight());
 
     m_gbufferfb.attachTexture(*m_gbuffers.position, GL_COLOR_ATTACHMENT0, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.bufferA, GL_COLOR_ATTACHMENT1, 0);
@@ -405,6 +405,8 @@ void RenderLoo::deferredPass() {
     m_deferredshader.setTexture(3, *m_gbuffers.bufferC);
     m_deferredshader.setTexture(4, *m_mainlightshadowmap);
     m_deferredshader.setTexture(5, m_skybox.getDiffuseConv());
+    m_deferredshader.setTexture(6, m_skybox.getSpecularConv());
+    m_deferredshader.setTexture(7, m_skybox.getBRDFLUT());
     m_deferredshader.setUniform("mainLightMatrix",
                                 m_lights[0].getLightSpaceMatrix());
 
@@ -483,6 +485,7 @@ void RenderLoo::loop() {
     m_maincam.m_aspect = getWindowRatio();
     // render
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     glDisable(GL_CULL_FACE);
     glViewport(0, 0, getWidth(), getHeight());
 

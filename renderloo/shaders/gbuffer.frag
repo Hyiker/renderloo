@@ -39,10 +39,10 @@ void GBufferFromPBRMaterial(in vec2 texCoord, in sampler2D baseColorTex,
                             inout vec4 GBufferA, inout vec4 GBufferB,
                             inout vec4 GBufferC) {
     GBufferA.rgb = texture(baseColorTex, texCoord).rgb * baseColor;
-    GBufferB.r = length(texture(metallicTex, texCoord).rgb) * metallic;
+    GBufferB.r = texture(metallicTex, texCoord).b * metallic;
     GBufferB.gb = texCoord;
     GBufferB.a = texture(occlusionTex, texCoord).r;
-    GBufferC.a = length(texture(roughnessTex, texCoord).rgb) * roughness;
+    GBufferC.a = texture(roughnessTex, texCoord).g * roughness;
 }
 #else
 layout(std140, binding = 2) uniform SimpleMaterial {
