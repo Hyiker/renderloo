@@ -31,15 +31,7 @@ void loadScene(RenderLoo& app, const char* filename) {
     using namespace std;
     fs::path p(filename);
     auto suffix = p.extension();
-    if (suffix == ".obj" || suffix == ".fbx") {
-        LOG(INFO) << "Loading model from " << suffix << " file" << endl;
-        app.loadModel(filename);
-    } else if (suffix == ".gltf" || suffix == ".glb") {
-        LOG(INFO) << "Loading scene from gltf file" << endl;
-        app.loadGLTF(filename);
-    } else {
-        LOG(FATAL) << "Unrecognizable file extension " << suffix << endl;
-    }
+    app.loadModel(filename);
     app.convertMaterial();
 }
 

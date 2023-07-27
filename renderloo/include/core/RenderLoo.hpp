@@ -28,7 +28,6 @@ class RenderLoo : public loo::Application {
     RenderLoo(int width, int height);
     // only load model
     void loadModel(const std::string& filename);
-    void loadGLTF(const std::string& filename);
     void loadSkybox(const std::string& filename);
     loo::Camera& getCamera() { return m_maincam; }
     void afterCleanup() override;
@@ -91,7 +90,6 @@ class RenderLoo : public loo::Application {
 
     // process
     FinalProcess m_finalprocess;
-
     bool m_wireframe{false};
     bool m_enablenormal{true};
     bool m_screenshotflag{false};

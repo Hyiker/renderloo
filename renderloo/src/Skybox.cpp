@@ -47,7 +47,7 @@ static shared_ptr<Texture2D> createTexture2DFromHDRFile(
     return tex;
 }
 
-static constexpr int ENVMAP_SIZE = 512, DIFFUSECONV_SIZE = 32,
+static constexpr int ENVMAP_SIZE = 1024, DIFFUSECONV_SIZE = 32,
                      SPECULARCONV_SIZE = 256, SPECULARCONV_MIPLEVEL = 5,
                      BRDFLUT_SIZE = 512;
 Skybox::Skybox()

@@ -10,6 +10,7 @@
 #include <loo/glError.hpp>
 #include <memory>
 #include <vector>
+#include "glm/gtx/string_cast.hpp"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <nfd.h>
 #include <stb_image_write.h>
@@ -40,11 +41,18 @@ static constexpr int SHADOWMAP_RESOLUION[2]{2048, 2048};
 
 static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn) {
     ImGui_ImplGlfw_CursorPosCallback(window, xposIn, yposIn);
+    if (ImGui::GetIO().WantCaptureMouse)
+        return;
     static bool firstMouse = true;
-    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE) {
+    bool leftPressing =
+             glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) != GLFW_RELEASE,
+         rightPressing = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) !=
+                         GLFW_RELEASE;
+    if (!leftPressing && !rightPressing) {
         firstMouse = true;
         return;
     }
+
     float xpos = static_cast<float>(xposIn);
     float ypos = static_cast<float>(yposIn);
     auto myapp = static_cast<RenderLoo*>(glfwGetWindowUserPointer(window));
@@ -62,7 +70,10 @@ static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn) {
 
     lastX = xpos;
     lastY = ypos;
-    myapp->getCamera().processMouseMovement(xoffset, yoffset);
+    if (rightPressing)
+        myapp->getCamera().rotateCamera(xoffset, yoffset);
+    else if (leftPressing)
+        myapp->getCamera().stareRotate(xoffset, yoffset);
 }
 
 static void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
@@ -73,23 +84,33 @@ static void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
     auto myapp = static_cast<RenderLoo*>(glfwGetWindowUserPointer(window));
     myapp->getCamera().processMouseScroll(xOffset, yOffset);
 }
+static Camera placeCameraBySceneAABB(const AABB& aabb) {
+    vec3 center = aabb.getCenter();
+    vec3 diagonal = aabb.getDiagonal();
+    float r = std::max(diagonal.x, diagonal.y) / 2.0;
+    float fov = glm::radians(60.f);
+    float dist = r / sin(fov / 2.0);
+    float overlookAngle = glm::radians(45.f);
+    float y = dist * tan(overlookAngle);
+    vec3 pos = center + vec3(0, y, dist);
+
+    return Camera(pos, center, fov, 0.01, std::max(100.0f, dist + r));
+}
 
 void RenderLoo::loadModel(const std::string& filename) {
     LOG(INFO) << "Loading model from " << filename << endl;
-    auto meshes = createMeshFromFile(filename);
+    m_scene.clear();
+    auto meshes = createMeshFromFile(filename, m_scene.modelName);
     m_scene.addMeshes(std::move(meshes));
+    if (m_scene.modelName.empty()) {
+        fs::path p(filename);
+        // filename without extension
+        m_scene.modelName = p.stem().string();
+    }
 
     m_scene.prepare();
-    LOG(INFO) << "Load done" << endl;
-}
-
-void RenderLoo::loadGLTF(const std::string& filename) {
-    LOG(INFO) << "Loading scene from " << filename << endl;
-    // TODO: m_scene = createSceneFromFile(filename);
-    auto meshes = createMeshFromFile(filename);
-    m_scene.addMeshes(std::move(meshes));
-
-    m_scene.prepare();
+    AABB sceneAABB = m_scene.computeAABBWorldSpace();
+    m_maincam = placeCameraBySceneAABB(sceneAABB);
     LOG(INFO) << "Load done" << endl;
 }
 
@@ -286,7 +307,6 @@ void RenderLoo::gui() {
                                        (float*)&m_lights[0].intensity, 0.0,
                                        100.0);
                 }
-
             // OpenGL option
             if (ImGui::CollapsingHeader("Render options",
                                         ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -294,24 +314,46 @@ void RenderLoo::gui() {
                 ImGui::Checkbox("Normal mapping", &m_enablenormal);
             }
             // Resources
-            if (ImGui::CollapsingHeader("Resources",
+            if (ImGui::CollapsingHeader("Assets",
                                         ImGuiTreeNodeFlags_DefaultOpen)) {
-                string path = m_skybox.path;
-                fs::path p(path);
-                string filename = p.filename().string();
-                ImGui::PushItemWidth(230);
-                ImGui::InputText("", const_cast<char*>(filename.c_str()),
-                                 m_skybox.path.size(),
-                                 ImGuiInputTextFlags_ReadOnly);
-                ImGui::SameLine();
-                if (ImGui::Button("Load")) {
-                    nfdchar_t* outPath;
-                    nfdfilteritem_t filterItem[1] = {{"HDR Image", "hdr,exr"}};
-                    nfdresult_t result =
-                        NFD_OpenDialog(&outPath, filterItem, 1, nullptr);
-                    if (result == NFD_OKAY) {
-                        m_skybox.loadTexture(outPath);
-                        free(outPath);
+                {
+                    string path = m_skybox.path;
+                    fs::path p(path);
+                    string filename = p.filename().string();
+                    ImGui::PushItemWidth(150);
+                    ImGui::InputText("", const_cast<char*>(filename.c_str()),
+                                     filename.size(),
+                                     ImGuiInputTextFlags_ReadOnly);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Load HDRI")) {
+                        nfdchar_t* outPath;
+                        nfdfilteritem_t filterItem[1] = {
+                            {"HDR Image", "hdr,exr"}};
+                        nfdresult_t result =
+                            NFD_OpenDialog(&outPath, filterItem, 1, nullptr);
+                        if (result == NFD_OKAY) {
+                            m_skybox.loadTexture(outPath);
+                            free(outPath);
+                        }
+                    }
+                }
+                {
+                    ImGui::PushItemWidth(150);
+                    ImGui::InputText(
+                        "", const_cast<char*>(m_scene.modelName.c_str()),
+                        m_scene.modelName.size(), ImGuiInputTextFlags_ReadOnly);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Load Model")) {
+                        nfdchar_t* outPath;
+                        nfdfilteritem_t filterItem[1] = {
+                            {"Model Files", "glb,gltf,obj,fbx"}};
+                        nfdresult_t result =
+                            NFD_OpenDialog(&outPath, filterItem, 1, nullptr);
+                        if (result == NFD_OKAY) {
+                            loadModel(outPath);
+                            convertMaterial();
+                            free(outPath);
+                        }
                     }
                 }
             }
@@ -342,14 +384,17 @@ void RenderLoo::finalScreenPass() {
 }
 
 void RenderLoo::convertMaterial() {
+    int cnt = 0;
     for (auto& mesh : m_scene.getMeshes()) {
         // Now default material is PBR material
         if (mesh->material) {
 #ifdef MATERIAL_PBR
-            LOG(INFO) << "Converting material to PBR material";
-            auto pbrMaterial = convertPBRMetallicMaterialFromBaseMaterial(
-                *static_pointer_cast<BaseMaterial>(mesh->material));
-            mesh->material = pbrMaterial;
+            if (!dynamic_pointer_cast<PBRMetallicMaterial>(mesh->material)) {
+                auto pbrMaterial = convertPBRMetallicMaterialFromBaseMaterial(
+                    *static_pointer_cast<BaseMaterial>(mesh->material));
+                mesh->material = pbrMaterial;
+                cnt++;
+            }
 #else
             LOG(INFO) << "Converting material to simple(blinn-phong) material";
             mesh->material = convertSimpleMaterialFromBaseMaterial(
@@ -357,6 +402,7 @@ void RenderLoo::convertMaterial() {
 #endif
         }
     }
+    LOG(INFO) << "Converted " << cnt << " materials to PBR materials";
 }
 
 void RenderLoo::skyboxPass() {
@@ -527,4 +573,6 @@ void RenderLoo::loop() {
     gui();
 }
 
-void RenderLoo::afterCleanup() {}
+void RenderLoo::afterCleanup() {
+    NFD_Quit();
+}
