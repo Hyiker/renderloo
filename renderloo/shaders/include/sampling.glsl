@@ -1,5 +1,5 @@
-#ifndef HDSSS_SHADERS_INCLUDE_SAMPLING_GLSL
-#define HDSSS_SHADERS_INCLUDE_SAMPLING_GLSL
+#ifndef RENDERLOO_SHADERS_INCLUDE_SAMPLING_HPP
+#define RENDERLOO_SHADERS_INCLUDE_SAMPLING_HPP
 
 const int SAMPLING_CATROM = 0, SAMPLING_MITCHELL = 1;
 // from https://github.com/runelite/runelite/blob/master/runelite-client/src/main/resources/net/runelite/client/plugins/gpu/scale/bicubic.glsl
@@ -146,4 +146,47 @@ vec4 textureCubic(sampler2D sampler, vec2 texCoords, int mode) {
     // return the weighted average
     return c;
 }
-#endif /* HDSSS_SHADERS_INCLUDE_SAMPLING_GLSL */
+// modified from https://www.shadertoy.com/view/4lscWj
+#define PI 3.1415926535897932384626433832795
+vec2 Hammersley(float i, float numSamples) {
+    uint b = uint(i);
+
+    b = (b << 16u) | (b >> 16u);
+    b = ((b & 0x55555555u) << 1u) | ((b & 0xAAAAAAAAu) >> 1u);
+    b = ((b & 0x33333333u) << 2u) | ((b & 0xCCCCCCCCu) >> 2u);
+    b = ((b & 0x0F0F0F0Fu) << 4u) | ((b & 0xF0F0F0F0u) >> 4u);
+    b = ((b & 0x00FF00FFu) << 8u) | ((b & 0xFF00FF00u) >> 8u);
+
+    float radicalInverseVDC = float(b) * 2.3283064365386963e-10;
+
+    return vec2((i / numSamples), radicalInverseVDC);
+}
+
+vec3 SampleHemisphereUniform(float i, float numSamples, out float pdf) {
+    // Returns a 3D sample vector orientated around (0.0, 0.0, 1.0)
+    // For practical use, must rotate with a rotation matrix (or whatever
+    // your preferred approach is) for use with normals, etc.
+
+    vec2 xi = Hammersley(i, numSamples);
+
+    float phi = xi.y * 2.0 * PI;
+    float cosTheta = 1.0 - xi.x;
+    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+    pdf = 1.0 / (2.0 * PI);
+
+    return vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+}
+
+vec3 SampleHemisphereCosineWeighted(float i, float numSamples, out float pdf) {
+    vec2 xi = Hammersley(i, numSamples);
+
+    float phi = xi.y * 2.0 * PI;
+    float cosTheta = sqrt(1.0 - xi.x);
+    float sinTheta = sqrt(1.0 - cosTheta * cosTheta);
+
+    pdf = cosTheta / PI;
+
+    return vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+}
+
+#endif /* RENDERLOO_SHADERS_INCLUDE_SAMPLING_HPP */

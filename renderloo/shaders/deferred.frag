@@ -11,6 +11,7 @@ layout(binding = 2) uniform sampler2D GBufferB;
 // normal(3) + roughness(1)
 layout(binding = 3) uniform sampler2D GBufferC;
 layout(binding = 4) uniform sampler2D MainLightShadowMap;
+layout(binding = 5) uniform samplerCube DiffuseConvolved;
 
 uniform mat4 mainLightMatrix;
 uniform vec3 cameraPosition;
@@ -41,6 +42,12 @@ void main() {
 
     vec3 V = normalize(cameraPosition - positionWS);
     vec3 diffuse = vec3(0.0), specular = vec3(0.0);
+    SurfaceParamsPBRMetallicRoughness surface;
+    surface.viewDirection = V;
+    surface.normal = normalize(normalWS);
+    surface.baseColor = baseColor;
+    surface.metallic = metallic;
+    surface.roughness = roughness;
     for (int i = 0; i < nLights; i++) {
         ShaderLight light = lights[i];
         float distance = 1.0;
@@ -57,26 +64,14 @@ void main() {
             computeShadow(mainLightMatrix, MainLightShadowMap, positionWS) *
             0.0;
         vec3 diff, spec;
-#ifdef MATERIAL_PBR
-        SurfaceParamsPBRMetallicRoughness surface;
-        surface.viewDirection = V;
-        surface.normal = normalize(normalWS);
-        surface.baseColor = baseColor;
-        surface.metallic = metallic;
-        surface.roughness = roughness;
         computePBRMetallicRoughnessLocalLighting(surface, light, V, L,
                                                  intensity, diff, spec);
-#else
-        SurfaceParamsBlinnPhong params;
-        params.baseColor = baseColor;
-        params.shininess = 20.0;
-        params.normal = normalWS;
-        computeBlinnPhongLocalLighting(params, light, V, L, intensity, diff,
-                                       spec);
-#endif
         diffuse += diff * (1.0 - shadow);
         specular += spec * (1.0 - shadow);
     }
-    DiffuseResult = diffuse;
-    SpecularResult = specular;
+    // compute environment lighting
+    vec3 envDiffuse;
+    computePBRMetallicRoughnessIBL(surface, DiffuseConvolved, V, envDiffuse);
+    DiffuseResult = envDiffuse;
+    SpecularResult = vec3(0.0);
 }

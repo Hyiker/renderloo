@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include "core/Transforms.hpp"
 #include "core/constants.hpp"
+#include "shaders/envmapConvolution.frag.hpp"
 #include "shaders/equirectangularMapper.frag.hpp"
 #include "shaders/equirectangularMapper.vert.hpp"
 #include "shaders/skybox.frag.hpp"
@@ -42,13 +43,16 @@ static shared_ptr<Texture2D> createTexture2DFromHDRFile(
     return tex;
 }
 
-static constexpr int CUBEMAP_SIZE = 1024;
+static constexpr int ENVMAP_SIZE = 1024, DIFFUSECONV_SIZE = 32;
 Skybox::Skybox()
     : m_shader{Shader(SKYBOX_VERT, ShaderType::Vertex),
                Shader(SKYBOX_FRAG, ShaderType::Fragment)},
       m_equirectangularToCubemapShader(
           {Shader(EQUIRECTANGULARMAPPER_VERT, ShaderType::Vertex),
-           Shader(EQUIRECTANGULARMAPPER_FRAG, ShaderType::Fragment)}) {
+           Shader(EQUIRECTANGULARMAPPER_FRAG, ShaderType::Fragment)}),
+      m_convolutionShader{
+          Shader(EQUIRECTANGULARMAPPER_VERT, ShaderType::Vertex),
+          Shader(ENVMAPCONVOLUTION_FRAG, ShaderType::Fragment)} {
     constexpr float skyboxVertices[] = {
         // positions
         -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f,
@@ -79,11 +83,11 @@ Skybox::Skybox()
                           (void*)0);
     glBindVertexArray(0);
 
-    equiangularHelper.framebuffer.init();
-    equiangularHelper.renderbuffer.init(GL_DEPTH_COMPONENT24, CUBEMAP_SIZE,
-                                        CUBEMAP_SIZE);
+    helper.framebuffer.init();
+    helper.renderbuffer.init(GL_DEPTH_COMPONENT24, ENVMAP_SIZE, ENVMAP_SIZE);
 }
 void Skybox::renderEquirectangularToCubemap(const loo::Texture2D& equiTexture) {
+
     glm::mat4 captureProjection =
         glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
     glm::mat4 captureViews[] = {
@@ -102,25 +106,64 @@ void Skybox::renderEquirectangularToCubemap(const loo::Texture2D& equiTexture) {
 
     // convert HDR equirectangular environment map to cubemap equivalent
     m_equirectangularToCubemapShader.use();
-    m_equirectangularToCubemapShader.setUniform("equirectangularMap", 0);
     m_equirectangularToCubemapShader.setUniform("projection",
                                                 captureProjection);
     m_equirectangularToCubemapShader.setTexture(0, equiTexture);
 
-    glViewport(0, 0, CUBEMAP_SIZE, CUBEMAP_SIZE);
-    equiangularHelper.framebuffer.bind();
+    glViewport(0, 0, ENVMAP_SIZE, ENVMAP_SIZE);
+    helper.framebuffer.bind();
+    helper.renderbuffer.set(GL_DEPTH_COMPONENT24, ENVMAP_SIZE, ENVMAP_SIZE);
     for (unsigned int i = 0; i < 6; ++i) {
         m_equirectangularToCubemapShader.setUniform("view", captureViews[i]);
-        glNamedFramebufferTextureLayer(equiangularHelper.framebuffer.getId(),
-                                       GL_COLOR_ATTACHMENT0, m_tex->getId(), 0,
-                                       i);
+        glNamedFramebufferTextureLayer(helper.framebuffer.getId(),
+                                       GL_COLOR_ATTACHMENT0, m_envmap->getId(),
+                                       0, i);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glBindVertexArray(vao);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
     }
-    equiangularHelper.framebuffer.unbind();
+    helper.framebuffer.unbind();
+}
+void Skybox::convolveEnvmap() {
+    glm::mat4 captureProjection =
+        glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    glm::mat4 captureViews[] = {
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f),
+                    glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f),
+                    glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f),
+                    glm::vec3(0.0f, 0.0f, 1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f),
+                    glm::vec3(0.0f, 0.0f, -1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f),
+                    glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f),
+                    glm::vec3(0.0f, -1.0f, 0.0f))};
+
+    // convert HDR equirectangular environment map to cubemap equivalent
+    m_convolutionShader.use();
+    m_convolutionShader.setUniform("projection", captureProjection);
+    m_convolutionShader.setTexture(0, getEnvmap());
+
+    glViewport(0, 0, DIFFUSECONV_SIZE, DIFFUSECONV_SIZE);
+    helper.framebuffer.bind();
+    helper.renderbuffer.set(GL_DEPTH_COMPONENT24, DIFFUSECONV_SIZE,
+                            DIFFUSECONV_SIZE);
+    for (unsigned int i = 0; i < 6; ++i) {
+        m_convolutionShader.setUniform("view", captureViews[i]);
+        glNamedFramebufferTextureLayer(helper.framebuffer.getId(),
+                                       GL_COLOR_ATTACHMENT0,
+                                       m_diffuseConv->getId(), 0, i);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glBindVertexArray(vao);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
+    }
+    helper.framebuffer.unbind();
 }
 
 void Skybox::loadTexture(const std::string& path) {
@@ -137,21 +180,31 @@ void Skybox::loadTexture(const std::string& path) {
                                    .bottom("bottom")
                                    .prefix(path)
                                    .build();
-        m_tex = createTextureCubeMapFromFiles(
+        m_envmap = createTextureCubeMapFromFiles(
             skyboxFilenames,
             TEXTURE_OPTION_CONVERT_TO_LINEAR | TEXTURE_OPTION_MIPMAP);
     } else {
         // compute cubemap from equirectangular map
         auto equiMap = createTexture2DFromHDRFile(path);
-        if (!m_tex) {
-            m_tex = make_unique<TextureCubeMap>();
-            m_tex->init();
-            m_tex->setupStorage(CUBEMAP_SIZE, CUBEMAP_SIZE, GL_RGB16F, 1);
-            m_tex->setWrapFilter(GL_CLAMP_TO_EDGE);
-            m_tex->setSizeFilter(GL_LINEAR, GL_LINEAR);
+        if (!m_envmap) {
+            m_envmap = make_unique<TextureCubeMap>();
+            m_envmap->init();
+            m_envmap->setupStorage(ENVMAP_SIZE, ENVMAP_SIZE, GL_RGB16F, 1);
+            m_envmap->setWrapFilter(GL_CLAMP_TO_EDGE);
+            m_envmap->setSizeFilter(GL_LINEAR, GL_LINEAR);
+        }
+        if (!m_diffuseConv) {
+            m_diffuseConv = make_unique<TextureCubeMap>();
+            m_diffuseConv->init();
+            m_diffuseConv->setupStorage(DIFFUSECONV_SIZE, DIFFUSECONV_SIZE,
+                                        GL_RGB16F, 1);
+            m_diffuseConv->setWrapFilter(GL_CLAMP_TO_EDGE);
+            m_diffuseConv->setSizeFilter(GL_LINEAR, GL_LINEAR);
         }
         LOG(INFO) << "Converting equirectangular map to cubemap" << endl;
         renderEquirectangularToCubemap(*equiMap);
+        LOG(INFO) << "Convolving envmap" << endl;
+        convolveEnvmap();
     }
     this->path = path;
 }
@@ -161,8 +214,7 @@ void Skybox::draw(glm::mat4 view) const {
     ShaderProgram::getUniformBlock(SHADER_UB_PORT_MVP)
         .mapBufferScoped<MVP>(
             [&](MVP& mvp) { mvp.view = glm::mat4(glm::mat3(view)); });
-    m_shader.setTexture(SHADER_SAMPLER_PORT_SKYBOX,
-                        m_tex ? *m_tex : TextureCubeMap::getBlackTexture());
+    m_shader.setTexture(SHADER_SAMPLER_PORT_SKYBOX, getEnvmap());
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);

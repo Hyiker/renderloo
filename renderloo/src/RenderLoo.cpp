@@ -404,6 +404,7 @@ void RenderLoo::deferredPass() {
     m_deferredshader.setTexture(2, *m_gbuffers.bufferB);
     m_deferredshader.setTexture(3, *m_gbuffers.bufferC);
     m_deferredshader.setTexture(4, *m_mainlightshadowmap);
+    m_deferredshader.setTexture(5, m_skybox.getDiffuseConv());
     m_deferredshader.setUniform("mainLightMatrix",
                                 m_lights[0].getLightSpaceMatrix());
 

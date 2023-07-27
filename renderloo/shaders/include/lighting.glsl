@@ -52,6 +52,11 @@ vec3 FresnelSchlickApprox(in vec3 F0, in vec3 V, in vec3 H) {
     float F = pow(1.0 - VoH, 5.0);
     return F0 + (1.0 - F0) * F;
 }
+
+vec3 FresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) *
+                    pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
 float SchlickGGXGeometry(in float roughness, in vec3 L, in vec3 V, in vec3 N) {
     float alpha = (roughness + 1) * 0.5;
     alpha *= alpha;
@@ -110,6 +115,22 @@ void computePBRMetallicRoughnessLocalLighting(
     vec3 radiance = light.color.rgb * intensity;
     diffuse = kD * baseColor * radiance * NdotL * PI_INV;
     specular = PBRCookTorranceBRDF(surface, light, L) * radiance * NdotL;
+}
+
+void computePBRMetallicRoughnessIBL(
+    in SurfaceParamsPBRMetallicRoughness surface,
+    in samplerCube diffuseConvolved, in vec3 V, out vec3 diffuse) {
+    vec3 N = surface.normal;
+    float NdotV = max(dot(N, V), 0.0);
+    vec3 baseColor = surface.baseColor;
+
+    vec3 F0 = mix(vec3(0.04), surface.baseColor, surface.metallic);
+    vec3 F = FresnelSchlickRoughness(NdotV, F0, surface.roughness);
+
+    vec3 kD = (1.0 - F) * (1.0 - surface.metallic);
+    // diffuse irradiance has already been divided by PI, no need to do it here
+    vec3 diffuseIrradiance = texture(diffuseConvolved, N).rgb;
+    diffuse = kD * baseColor * diffuseIrradiance;
 }
 
 void computeBlinnPhongLocalLighting(in SurfaceParamsBlinnPhong surfaceParams,

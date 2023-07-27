@@ -2,7 +2,7 @@
 layout(location = 0) in vec3 localPos;
 layout(location = 0) out vec4 FragColor;
 
-layout(location = 3) uniform sampler2D equirectangularMap;
+layout(binding = 0, location = 3) uniform sampler2D equirectangularMap;
 
 const vec2 invAtan = vec2(0.1591, 0.3183);
 vec2 SampleSphericalMap(vec3 v) {
