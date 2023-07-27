@@ -22,9 +22,9 @@ uniform bool enableNormal;
 uniform bool enableParallax;
 #ifdef MATERIAL_PBR
 layout(std140, binding = 3) uniform PBRMetallicMaterial {
-    vec4 baseColorMetallic;
+    vec4 baseColor;
     // roughness(1) + padding(3)
-    vec4 roughness;
+    vec4 metallicRoughness;
 }
 material;
 layout(binding = 10) uniform sampler2D baseColorTex;
@@ -95,10 +95,10 @@ void main() {
     FragPosition = vec4(vPos, 1);
     GBufferC.rgb = sNormal;
 #ifdef MATERIAL_PBR
-    GBufferFromPBRMaterial(texCoord, baseColorTex, occlusionTex, metallicTex,
-                           roughnessTex, material.baseColorMetallic.rgb,
-                           material.baseColorMetallic.a, material.roughness.r,
-                           GBufferA, GBufferB, GBufferC);
+    GBufferFromPBRMaterial(
+        texCoord, baseColorTex, occlusionTex, metallicTex, roughnessTex,
+        material.baseColor.rgb, material.metallicRoughness.r,
+        material.metallicRoughness.g, GBufferA, GBufferB, GBufferC);
 #else
     GBufferFromSimpleMaterial(texCoord, diffuseTex, specularTex,
                               material.diffuse.rgb, material.specular.rgb,

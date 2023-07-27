@@ -28,6 +28,7 @@
 #include "shaders/gbuffer.vert.hpp"
 #include "shaders/shadowmap.frag.hpp"
 #include "shaders/shadowmap.vert.hpp"
+#include "shaders/transparent.frag.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/ext.hpp>
@@ -129,6 +130,10 @@ RenderLoo::RenderLoo(int width, int height)
                         Shader(SHADOWMAP_FRAG, ShaderType::Fragment)},
       m_deferredshader{Shader(DEFERRED_VERT, ShaderType::Vertex),
                        Shader(DEFERRED_FRAG, ShaderType::Fragment)},
+      m_transparentShader({
+          Shader(GBUFFER_VERT, ShaderType::Vertex),
+          Shader(TRANSPARENT_FRAG, ShaderType::Fragment),
+      }),
 
       m_finalprocess(getWidth(), getHeight()) {
 
@@ -137,6 +142,7 @@ RenderLoo::RenderLoo(int width, int height)
     initGBuffers();
     initShadowMap();
     initDeferredPass();
+    initTransparentPass();
 
     // final pass related
     { m_finalprocess.init(); }
@@ -216,25 +222,27 @@ void RenderLoo::initShadowMap() {
 }
 void RenderLoo::initDeferredPass() {
     m_deferredfb.init();
-    m_diffuseresult = make_shared<Texture2D>();
-    m_diffuseresult->init();
-    m_diffuseresult->setupStorage(getWidth(), getHeight(), GL_RGB32F, 1);
-    m_diffuseresult->setSizeFilter(GL_LINEAR, GL_LINEAR);
-
-    m_specularresult = make_unique<Texture2D>();
-    m_specularresult->init();
-    m_specularresult->setupStorage(getWidth(), getHeight(), GL_RGB32F, 1);
-    m_specularresult->setSizeFilter(GL_LINEAR, GL_LINEAR);
+    m_deferredResult = make_shared<Texture2D>();
+    m_deferredResult->init();
+    m_deferredResult->setupStorage(getWidth(), getHeight(), GL_RGBA32F, 1);
+    m_deferredResult->setSizeFilter(GL_LINEAR, GL_LINEAR);
 
     m_skyboxresult = make_unique<Texture2D>();
     m_skyboxresult->init();
     m_skyboxresult->setupStorage(getWidth(), getHeight(), GL_RGB32F, 1);
     m_skyboxresult->setSizeFilter(GL_LINEAR, GL_LINEAR);
 
-    m_deferredfb.attachTexture(*m_diffuseresult, GL_COLOR_ATTACHMENT0, 0);
-    m_deferredfb.attachTexture(*m_specularresult, GL_COLOR_ATTACHMENT1, 0);
-    m_deferredfb.attachTexture(*m_skyboxresult, GL_COLOR_ATTACHMENT2, 0);
+    m_deferredfb.attachTexture(*m_deferredResult, GL_COLOR_ATTACHMENT0, 0);
+    m_deferredfb.attachTexture(*m_skyboxresult, GL_COLOR_ATTACHMENT1, 0);
     m_deferredfb.attachRenderbuffer(m_gbuffers.depthrb, GL_DEPTH_ATTACHMENT);
+    panicPossibleGLError();
+}
+
+void RenderLoo::initTransparentPass() {
+
+    m_transparentfb.init();
+    m_transparentfb.attachTexture(*m_deferredResult, GL_COLOR_ATTACHMENT0, 0);
+    m_transparentfb.attachRenderbuffer(m_gbuffers.depthrb, GL_DEPTH_ATTACHMENT);
     panicPossibleGLError();
 }
 void RenderLoo::saveScreenshot(fs::path filename) const {
@@ -378,9 +386,8 @@ void RenderLoo::gui() {
 }
 
 void RenderLoo::finalScreenPass() {
-    m_finalprocess.render(*m_diffuseresult, *m_specularresult,
-                          *m_gbuffers.bufferB, *m_skyboxresult,
-                          m_finalpassoptions);
+    m_finalprocess.render(*m_deferredResult, *m_gbuffers.bufferB,
+                          *m_skyboxresult);
 }
 
 void RenderLoo::convertMaterial() {
@@ -424,7 +431,8 @@ void RenderLoo::gbufferPass() {
 
     clear();
 
-    scene();
+    m_baseshader.use();
+    scene(m_baseshader, RenderFlag_Opaque);
 
     m_gbufferfb.unbind();
 }
@@ -447,6 +455,8 @@ void RenderLoo::shadowMapPass() {
     m_shadowmapshader.setUniform("lightSpaceMatrix", lightSpaceMatrix);
 
     for (auto mesh : m_scene.getMeshes()) {
+        if (mesh->isTransparent())
+            continue;
         drawMesh(*mesh, m_scene.getModelMatrix(), m_shadowmapshader);
     }
 
@@ -458,8 +468,7 @@ void RenderLoo::deferredPass() {
     // render gbuffer here
 
     m_deferredfb.bind();
-    m_deferredfb.enableAttachments(
-        {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1});
+    m_deferredfb.enableAttachments({GL_COLOR_ATTACHMENT0});
 
     glClearColor(0.f, 0.f, 0.f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -490,7 +499,7 @@ void RenderLoo::deferredPass() {
     glDisable(GL_DEPTH_TEST);
     Quad::globalQuad().draw();
 
-    m_deferredfb.enableAttachments({GL_COLOR_ATTACHMENT2});
+    m_deferredfb.enableAttachments({GL_COLOR_ATTACHMENT1});
     glClearColor(0.f, 0.f, 0.f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     glEnable(GL_DEPTH_TEST);
@@ -498,7 +507,34 @@ void RenderLoo::deferredPass() {
     m_gbufferfb.unbind();
 }
 
-void RenderLoo::scene() {
+void RenderLoo::transparentPass() {
+    // render gbuffer here
+    m_transparentfb.bind();
+
+    m_transparentfb.enableAttachments({GL_COLOR_ATTACHMENT0});
+
+    m_transparentShader.use();
+
+    m_transparentShader.setTexture(20, m_skybox.getDiffuseConv());
+    m_transparentShader.setTexture(21, m_skybox.getSpecularConv());
+    m_transparentShader.setTexture(22, m_skybox.getBRDFLUT());
+    m_transparentShader.setTexture(23, *m_mainlightshadowmap);
+    m_transparentShader.setUniform("cameraPosition", m_maincam.getPosition());
+    m_transparentShader.setUniform("mainLightMatrix",
+                                   m_lights[0].getLightSpaceMatrix());
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+    scene(m_transparentShader, RenderFlag_Transparent);
+
+    m_gbufferfb.unbind();
+    glDisable(GL_BLEND);
+    glDepthMask(GL_TRUE);
+}
+
+void RenderLoo::scene(loo::ShaderProgram& shader, RenderFlag flag) {
     glEnable(GL_DEPTH_TEST);
     ShaderProgram::getUniformBlock(SHADER_UB_PORT_MVP)
         .mapBufferScoped<MVP>([this](MVP& mvp) {
@@ -507,13 +543,16 @@ void RenderLoo::scene() {
         });
 
     logPossibleGLError();
-    m_baseshader.use();
+    shader.use();
 
-    m_baseshader.setUniform("enableNormal", m_enablenormal);
+    shader.setUniform("enableNormal", m_enablenormal);
     logPossibleGLError();
-
+    bool renderOpaque = flag & RenderFlag_Opaque,
+         renderTransparent = flag & RenderFlag_Transparent;
     for (auto mesh : m_scene.getMeshes()) {
-        drawMesh(*mesh, m_scene.getModelMatrix(), m_baseshader);
+        if ((!mesh->isTransparent() && renderOpaque) ||
+            (mesh->isTransparent() && renderTransparent))
+            drawMesh(*mesh, m_scene.getModelMatrix(), m_baseshader);
     }
     logPossibleGLError();
 }
@@ -562,6 +601,8 @@ void RenderLoo::loop() {
         shadowMapPass();
 
         deferredPass();
+
+        transparentPass();
 
         finalScreenPass();
     }

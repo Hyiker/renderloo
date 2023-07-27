@@ -23,6 +23,12 @@
 #include "core/FinalProcess.hpp"
 #include "core/constants.hpp"
 
+enum RenderFlag {
+    RenderFlag_Opaque = 1 << 0,
+    RenderFlag_Transparent = 1 << 1,
+    RenderFlag_All = RenderFlag_Opaque | RenderFlag_Transparent
+};
+
 class RenderLoo : public loo::Application {
    public:
     RenderLoo(int width, int height);
@@ -38,10 +44,11 @@ class RenderLoo : public loo::Application {
     void initGBuffers();
     void initShadowMap();
     void initDeferredPass();
+    void initTransparentPass();
 
     void loop() override;
     void gui();
-    void scene();
+    void scene(loo::ShaderProgram& shader, RenderFlag flag = RenderFlag_All);
     void skyboxPass();
     // first pass: gbuffer
     void gbufferPass();
@@ -49,6 +56,8 @@ class RenderLoo : public loo::Application {
     void shadowMapPass();
     // third pass: deferred pass(illumination)
     void deferredPass();
+    // fourth pass: transparent pass
+    void transparentPass();
 
     // seventh pass: merge all effects
     void finalScreenPass();
@@ -82,9 +91,11 @@ class RenderLoo : public loo::Application {
     loo::ShaderProgram m_deferredshader;
     loo::Framebuffer m_deferredfb;
     // diffuse
-    std::shared_ptr<loo::Texture2D> m_diffuseresult;
-    // specular
-    std::unique_ptr<loo::Texture2D> m_specularresult;
+    std::shared_ptr<loo::Texture2D> m_deferredResult;
+
+    // transparent pass
+    loo::Framebuffer m_transparentfb;
+    loo::ShaderProgram m_transparentShader;
     // skybox
     std::unique_ptr<loo::Texture2D> m_skyboxresult;
 

@@ -15,13 +15,12 @@
 struct ShaderPBRMetallicMaterial {
     // std140 pad vec3 to 4N(N = 4B)
     // using vec4 to save your day
-    glm::vec4 baseColorMetallic;
+    glm::vec4 baseColor;
     // roughness(1) + padding(3)
-    glm::vec4 roughness;
-    ShaderPBRMetallicMaterial(glm::vec3 baseColor, float metallic,
+    glm::vec4 metallicRoughness;
+    ShaderPBRMetallicMaterial(glm::vec4 baseColor, float metallic,
                               float roughness)
-        : baseColorMetallic(baseColor, metallic),
-          roughness(roughness, 0, 0, 0) {}
+        : baseColor(baseColor), metallicRoughness(metallic, roughness, 0, 0) {}
 };
 class PBRMetallicMaterial : public loo::Material {
     ShaderPBRMetallicMaterial m_shadermaterial;
@@ -32,9 +31,12 @@ class PBRMetallicMaterial : public loo::Material {
     const ShaderPBRMetallicMaterial& getShaderMaterial() const {
         return m_shadermaterial;
     }
-    PBRMetallicMaterial(glm::vec3 baseColor, float metallic, float roughness)
+    PBRMetallicMaterial(glm::vec4 baseColor, float metallic, float roughness)
         : m_shadermaterial(baseColor, metallic, roughness) {}
     static void init();
+    [[nodiscard]] bool isTransparent() const override {
+        return m_shadermaterial.baseColor.a < 1.0f;
+    }
     void bind(const loo::ShaderProgram& sp) override;
     std::shared_ptr<loo::Texture2D> baseColorTex{};
     std::shared_ptr<loo::Texture2D> occlusionTex{};

@@ -2,7 +2,7 @@
 #extension GL_GOOGLE_include_directive : enable
 
 #include "include/lighting.glsl"
-
+layout(early_fragment_tests) in;
 layout(binding = 0) uniform sampler2D GBufferPosition;
 // base color(3) + unused(1)
 layout(binding = 1) uniform sampler2D GBufferA;
@@ -19,8 +19,7 @@ uniform mat4 mainLightMatrix;
 uniform vec3 cameraPosition;
 
 in vec2 texCoord;
-layout(location = 0) out vec3 DiffuseResult;
-layout(location = 1) out vec3 SpecularResult;
+layout(location = 0) out vec4 FragResult;
 
 layout(std140, binding = 1) uniform LightBlock {
     ShaderLight lights[12];
@@ -65,8 +64,7 @@ void main() {
         }
         float intensity = light.intensity / (distance * distance);
         float shadow =
-            computeShadow(mainLightMatrix, MainLightShadowMap, positionWS) *
-            0.0;
+            computeShadow(mainLightMatrix, MainLightShadowMap, positionWS);
         vec3 diff, spec;
         computePBRMetallicRoughnessLocalLighting(surface, light, V, L,
                                                  intensity, diff, spec);
@@ -79,6 +77,5 @@ void main() {
         computePBRMetallicRoughnessIBLDiffuse(surface, DiffuseConvolved, V);
     envSpecular = computePBRMetallicRoughnessIBLSpecular(
         surface, SpecularConvolved, BRDFLUT, V);
-    DiffuseResult = envDiffuse + diffuse;
-    SpecularResult = envSpecular + specular;
+    FragResult = vec4(envDiffuse + diffuse + envSpecular + specular, 1.0);
 }
