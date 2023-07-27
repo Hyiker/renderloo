@@ -24,5 +24,5 @@ void main() {
         vec3 dirWorld = TBN * dirLocal;
         irradiance += textureLod(envMap, dirWorld, 0.0).rgb * dirLocal.z / pdf;
     }
-    FragColor = irradiance / float(N_SAMPLES) * PI_INV;
+    FragColor = irradiance / float(N_SAMPLES);
 }
