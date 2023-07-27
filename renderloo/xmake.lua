@@ -2,10 +2,13 @@ add_rules("mode.debug", "mode.release")
 
 includes("spv2hpp")
 
+add_requires("nativefiledialog-extended")
+
 target("renderloo_lib")
     set_kind("static")
     add_deps("loo", "spv2hpp")
     set_symbols("debug")
+    add_packages("nativefiledialog-extended")
 
     add_includedirs("include", {public = true})
     set_languages("c11", "cxx17")

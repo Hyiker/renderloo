@@ -11,6 +11,7 @@
 #include <memory>
 #include <vector>
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <nfd.h>
 #include <stb_image_write.h>
 #include <functional>
 #include <glm/gtx/hash.hpp>
@@ -134,6 +135,8 @@ RenderLoo::RenderLoo(int width, int height)
     ShaderProgram::initUniformBlock(
         std::make_unique<UniformBuffer>(SHADER_UB_PORT_MVP, sizeof(MVP)));
     panicPossibleGLError();
+
+    NFD_Init();
 }
 void RenderLoo::initGBuffers() {
     m_gbufferfb.init();
@@ -263,10 +266,6 @@ void RenderLoo::gui() {
                     "Scene meshes: %d\n"
                     "Scene triangles: %d%s",
                     (int)m_scene.countMesh(), triangleCount, base);
-                ImGui::TextWrapped("Camera position: %.2f %.2f %.2f",
-                                   m_maincam.getPosition().x,
-                                   m_maincam.getPosition().y,
-                                   m_maincam.getPosition().z);
             }
         }
     }
@@ -280,7 +279,7 @@ void RenderLoo::gui() {
             if (!m_lights.empty())
                 if (ImGui::CollapsingHeader("Sun",
                                             ImGuiTreeNodeFlags_DefaultOpen)) {
-                    ImGui::ColorPicker3("Color", (float*)&m_lights[0].color);
+                    ImGui::ColorEdit3("Color", (float*)&m_lights[0].color);
                     ImGui::SliderFloat3("Direction",
                                         (float*)&m_lights[0].direction, -1, 1);
                     ImGui::SliderFloat("Intensity",
@@ -293,6 +292,28 @@ void RenderLoo::gui() {
                                         ImGuiTreeNodeFlags_DefaultOpen)) {
                 ImGui::Checkbox("Wire frame mode", &m_wireframe);
                 ImGui::Checkbox("Normal mapping", &m_enablenormal);
+            }
+            // Resources
+            if (ImGui::CollapsingHeader("Resources",
+                                        ImGuiTreeNodeFlags_DefaultOpen)) {
+                string path = m_skybox.path;
+                fs::path p(path);
+                string filename = p.filename().string();
+                ImGui::PushItemWidth(230);
+                ImGui::InputText("", const_cast<char*>(filename.c_str()),
+                                 m_skybox.path.size(),
+                                 ImGuiInputTextFlags_ReadOnly);
+                ImGui::SameLine();
+                if (ImGui::Button("Load")) {
+                    nfdchar_t* outPath;
+                    nfdfilteritem_t filterItem[1] = {{"HDR Image", "hdr,exr"}};
+                    nfdresult_t result =
+                        NFD_OpenDialog(&outPath, filterItem, 1, nullptr);
+                    if (result == NFD_OKAY) {
+                        m_skybox.loadTexture(outPath);
+                        free(outPath);
+                    }
+                }
             }
         }
     }

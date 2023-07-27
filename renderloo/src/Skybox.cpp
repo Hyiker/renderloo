@@ -229,10 +229,8 @@ void Skybox::loadTexture(const std::string& path) {
     } else {
         // compute cubemap from equirectangular map
         auto equiMap = createTexture2DFromHDRFile(path);
-        if (!m_envmap) {
-            m_envmap = make_unique<TextureCubeMap>();
-            m_envmap->init();
-        }
+        m_envmap = make_unique<TextureCubeMap>();
+        m_envmap->init();
         m_envmap->setupStorage(ENVMAP_SIZE, ENVMAP_SIZE, GL_RGB16F, -1);
         m_envmap->setWrapFilter(GL_CLAMP_TO_EDGE);
         m_envmap->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
