@@ -23,6 +23,7 @@
  *                              v
  *                           |output|
  * **/
+// TODO: implement SMAA T2x: temporal reprojection
 class SMAA {
    public:
     SMAA(int width, int height);

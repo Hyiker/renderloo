@@ -316,7 +316,7 @@ void RenderLoo::gui() {
                 ImGui::Checkbox("Wire frame mode", &m_wireframe);
                 ImGui::Checkbox("Normal mapping", &m_enablenormal);
                 const char* antialiasmethod[] = {"None", "SMAA"};
-                ImGui::Combo("Anti alias", (int*)(&m_antialiasmethod),
+                ImGui::Combo("Antialias", (int*)(&m_antialiasmethod),
                              antialiasmethod, IM_ARRAYSIZE(antialiasmethod));
             }
             // Resources
