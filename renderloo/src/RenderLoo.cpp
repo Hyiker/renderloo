@@ -384,7 +384,9 @@ void RenderLoo::gui() {
 }
 
 void RenderLoo::finalScreenPass(const loo::Texture2D& texture) {
+    beginEvent("Final Screen Pass");
     m_finalprocess.render(texture);
+    endEvent();
 }
 
 void RenderLoo::convertMaterial() {
@@ -425,6 +427,7 @@ void RenderLoo::skyboxPass() {
     m_deferredfb.unbind();
 }
 void RenderLoo::gbufferPass() {
+    beginEvent("GBuffer Pass");
     // render gbuffer here
     m_gbufferfb.bind();
 
@@ -437,9 +440,11 @@ void RenderLoo::gbufferPass() {
     scene(m_baseshader, RenderFlag_Opaque);
 
     m_gbufferfb.unbind();
+    endEvent();
 }
 
 void RenderLoo::shadowMapPass() {
+    beginEvent("Shadow Map Pass");
     // render shadow map here
     m_mainlightshadowmapfb.bind();
     int vp[4];
@@ -464,10 +469,11 @@ void RenderLoo::shadowMapPass() {
 
     m_mainlightshadowmapfb.unbind();
     glViewport(vp[0], vp[1], vp[2], vp[3]);
+    endEvent();
 }
 
 void RenderLoo::deferredPass() {
-    // render gbuffer here
+    beginEvent("Deferred Pass");
 
     m_deferredfb.bind();
     m_deferredfb.enableAttachments({GL_COLOR_ATTACHMENT0});
@@ -500,9 +506,12 @@ void RenderLoo::deferredPass() {
 
     glDisable(GL_DEPTH_TEST);
     Quad::globalQuad().draw();
+    glEnable(GL_DEPTH_TEST);
+    endEvent();
 }
 
 void RenderLoo::transparentPass() {
+    beginEvent("Transparent Pass");
     // render gbuffer here
     m_transparentfb.bind();
 
@@ -527,6 +536,7 @@ void RenderLoo::transparentPass() {
     m_gbufferfb.unbind();
     glDisable(GL_BLEND);
     glDepthMask(GL_TRUE);
+    endEvent();
 }
 
 void RenderLoo::scene(loo::ShaderProgram& shader, RenderFlag flag) {
@@ -601,9 +611,15 @@ void RenderLoo::loop() {
 
         transparentPass();
 
+        if (m_antialiasmethod == AntiAliasMethod::SMAA) {
+            beginEvent("SMAA Pass");
+        }
         const Texture2D& texture = m_antialiasmethod == AntiAliasMethod::None
                                        ? *m_deferredResult
-                                       : m_smaa.apply(*m_deferredResult);
+                                       : m_smaa.apply(*this, *m_deferredResult);
+        if (m_antialiasmethod == AntiAliasMethod::SMAA) {
+            endEvent();
+        }
 
         finalScreenPass(texture);
     }

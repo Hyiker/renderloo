@@ -98,7 +98,7 @@ class RenderLoo : public loo::Application {
     loo::ShaderProgram m_transparentShader;
 
     // antialias
-    AntiAliasMethod m_antialiasmethod{AntiAliasMethod::None};
+    AntiAliasMethod m_antialiasmethod{AntiAliasMethod::SMAA};
     SMAA m_smaa;
 
     // process
