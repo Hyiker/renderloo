@@ -4,17 +4,24 @@ includes("spv2hpp")
 
 add_requires("nativefiledialog-extended")
 
+target("renderloo_shaders")
+    set_kind("object")
+    add_deps("spv2hpp")
+    set_rules("glsl2hpp", {outputdir = path.join(os.scriptdir(), "include", "shaders"), defines = {"MATERIAL_PBR", "SMAA_PRESET_HIGH"}})
+
+    add_files("shaders/*.*", "shaders/SMAA/*.*")
+    remove_files("shaders/SMAA/SMAA.hlsl")
+
 target("renderloo_lib")
     set_kind("static")
-    add_deps("loo", "spv2hpp")
+    add_deps("loo", "renderloo_shaders")
     set_symbols("debug")
     add_packages("nativefiledialog-extended")
 
     add_includedirs("include", {public = true})
     set_languages("c11", "cxx17")
-    set_rules("glsl2hpp", {outputdir = path.join(os.scriptdir(), "include", "shaders"), defines = {"MATERIAL_PBR", "SMAA_PRESET_HIGH"}})
-    add_files("shaders/*.*", "shaders/SMAA/*.*", "src/**.cpp")
-    remove_files("src/main.cpp", "shaders/SMAA/SMAA.hlsl")
+    add_files("src/**.cpp")
+    remove_files("src/main.cpp")
 
     add_defines("_CRT_SECURE_NO_WARNINGS")
     set_policy("build.warning", true)

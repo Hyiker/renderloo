@@ -49,6 +49,12 @@ rule("glsl2hpp")
         batchcmds:set_depmtime(os.mtime(outputfile))
         batchcmds:set_depcache(target:dependfile(outputfile))
     end)
+    on_clean(function (target)
+        local outputdir = target:extraconf("rules", "glsl2hpp", "outputdir")
+        if outputdir then
+            os.rm(outputdir)
+        end
+    end)
 rule_end()
 
 target("spv2hpp")
