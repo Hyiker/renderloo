@@ -22,6 +22,7 @@ SMAA::SMAA(int width, int height)
 void SMAA::init() {
     m_fb.init();
 
+    m_rb.init(GL_STENCIL_INDEX8, m_width, m_height);
     m_edges = std::make_unique<loo::Texture2D>();
     m_edges->init();
     m_edges->setupStorage(m_width, m_height, GL_RGBA32F, 1);
@@ -53,19 +54,22 @@ void SMAA::init() {
     m_output->setupStorage(m_width, m_height, GL_RGBA32F, 1);
     m_output->setSizeFilter(GL_LINEAR, GL_LINEAR);
     m_output->setWrapFilter(GL_CLAMP_TO_EDGE);
+
+    m_fb.attachRenderbuffer(m_rb, GL_STENCIL_ATTACHMENT);
 }
 const loo::Texture2D& SMAA::apply(const loo::Application& app,
                                   const loo::Texture2D& src) {
     glm::vec4 metrics{1.0f / m_width, 1.0f / m_height, m_width, m_height};
     m_fb.bind();
     glDisable(GL_DEPTH_TEST);
+    glEnable(GL_STENCIL_TEST);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
     app.beginEvent("SMAA Edge Detection");
     // pass 1: edge detection
     m_fb.attachTexture(*m_edges, GL_COLOR_ATTACHMENT0, 0);
     m_fb.enableAttachments({GL_COLOR_ATTACHMENT0});
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     m_shaderpass1.use();
     m_shaderpass1.setUniform("rt_metrics", metrics);
     m_shaderpass1.setTexture(0, src);
@@ -87,6 +91,8 @@ const loo::Texture2D& SMAA::apply(const loo::Application& app,
     app.beginEvent("SMAA Neighborhood Blending");
     // pass 3: neighborhood blending
     m_fb.attachTexture(*m_output, GL_COLOR_ATTACHMENT0, 0);
+    // disable stencil test
+    glDisable(GL_STENCIL_TEST);
     m_shaderpass3.use();
     m_shaderpass3.setUniform("rt_metrics", metrics);
     m_shaderpass3.setTexture(0, src);
@@ -96,6 +102,7 @@ const loo::Texture2D& SMAA::apply(const loo::Application& app,
 
     m_fb.unbind();
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_STENCIL_TEST);
 
     return *m_output;
 }

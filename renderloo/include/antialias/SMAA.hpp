@@ -33,6 +33,8 @@ class SMAA {
    private:
     int m_width, m_height;
     loo::Framebuffer m_fb;
+    // stencil buffer used for the second pass
+    loo::Renderbuffer m_rb;
     // temporal textures, clear each frame
     std::unique_ptr<loo::Texture2D> m_edges, m_blend;
     // precomputed textures
