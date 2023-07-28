@@ -134,7 +134,7 @@ RenderLoo::RenderLoo(int width, int height)
           Shader(GBUFFER_VERT, ShaderType::Vertex),
           Shader(TRANSPARENT_FRAG, ShaderType::Fragment),
       }),
-
+      m_smaa(getWidth(), getHeight()),
       m_finalprocess(getWidth(), getHeight()) {
 
     PBRMetallicMaterial::init();
@@ -143,6 +143,7 @@ RenderLoo::RenderLoo(int width, int height)
     initShadowMap();
     initDeferredPass();
     initTransparentPass();
+    m_smaa.init();
 
     // final pass related
     { m_finalprocess.init(); }
@@ -227,13 +228,7 @@ void RenderLoo::initDeferredPass() {
     m_deferredResult->setupStorage(getWidth(), getHeight(), GL_RGBA32F, 1);
     m_deferredResult->setSizeFilter(GL_LINEAR, GL_LINEAR);
 
-    m_skyboxresult = make_unique<Texture2D>();
-    m_skyboxresult->init();
-    m_skyboxresult->setupStorage(getWidth(), getHeight(), GL_RGB32F, 1);
-    m_skyboxresult->setSizeFilter(GL_LINEAR, GL_LINEAR);
-
     m_deferredfb.attachTexture(*m_deferredResult, GL_COLOR_ATTACHMENT0, 0);
-    m_deferredfb.attachTexture(*m_skyboxresult, GL_COLOR_ATTACHMENT1, 0);
     m_deferredfb.attachRenderbuffer(m_gbuffers.depthrb, GL_DEPTH_ATTACHMENT);
     panicPossibleGLError();
 }
@@ -320,6 +315,9 @@ void RenderLoo::gui() {
                                         ImGuiTreeNodeFlags_DefaultOpen)) {
                 ImGui::Checkbox("Wire frame mode", &m_wireframe);
                 ImGui::Checkbox("Normal mapping", &m_enablenormal);
+                const char* antialiasmethod[] = {"None", "SMAA"};
+                ImGui::Combo("Anti alias", (int*)(&m_antialiasmethod),
+                             antialiasmethod, IM_ARRAYSIZE(antialiasmethod));
             }
             // Resources
             if (ImGui::CollapsingHeader("Assets",
@@ -385,9 +383,8 @@ void RenderLoo::gui() {
     }
 }
 
-void RenderLoo::finalScreenPass() {
-    m_finalprocess.render(*m_deferredResult, *m_gbuffers.bufferB,
-                          *m_skyboxresult);
+void RenderLoo::finalScreenPass(const loo::Texture2D& texture) {
+    m_finalprocess.render(texture);
 }
 
 void RenderLoo::convertMaterial() {
@@ -413,6 +410,9 @@ void RenderLoo::convertMaterial() {
 }
 
 void RenderLoo::skyboxPass() {
+    m_deferredfb.enableAttachments({GL_COLOR_ATTACHMENT0});
+    glEnable(GL_DEPTH_TEST);
+
     glDepthFunc(GL_LEQUAL);
     glDisable(GL_CULL_FACE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -421,6 +421,8 @@ void RenderLoo::skyboxPass() {
     m_skybox.draw(view);
     glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
+
+    m_deferredfb.unbind();
 }
 void RenderLoo::gbufferPass() {
     // render gbuffer here
@@ -498,13 +500,6 @@ void RenderLoo::deferredPass() {
 
     glDisable(GL_DEPTH_TEST);
     Quad::globalQuad().draw();
-
-    m_deferredfb.enableAttachments({GL_COLOR_ATTACHMENT1});
-    glClearColor(0.f, 0.f, 0.f, 0.0f);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glEnable(GL_DEPTH_TEST);
-    skyboxPass();
-    m_gbufferfb.unbind();
 }
 
 void RenderLoo::transparentPass() {
@@ -602,9 +597,15 @@ void RenderLoo::loop() {
 
         deferredPass();
 
+        skyboxPass();
+
         transparentPass();
 
-        finalScreenPass();
+        const Texture2D& texture = m_antialiasmethod == AntiAliasMethod::None
+                                       ? *m_deferredResult
+                                       : m_smaa.apply(*m_deferredResult);
+
+        finalScreenPass(texture);
     }
 
     keyboard();

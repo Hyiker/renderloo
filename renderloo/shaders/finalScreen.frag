@@ -4,8 +4,6 @@ out vec4 FragColor;
 in vec2 texCoord;
 
 layout(binding = 0) uniform sampler2D defferedTexture;
-layout(binding = 4) uniform sampler2D skyboxTexture;
-layout(binding = 5) uniform sampler2D GBuffer3;
 
 vec3 gammaCorrection(in vec3 color) {
     const float gamma = 2.2;
@@ -23,8 +21,7 @@ vec3 ACESToneMapping(vec3 x) {
 
 void main() {
     vec3 deffered = texture(defferedTexture, texCoord).rgb;
-    vec3 skyboxTexture = texture(skyboxTexture, texCoord).rgb;
-    vec3 color = deffered + skyboxTexture;
+    vec3 color = deffered;
     color = ACESToneMapping(color);
     color = gammaCorrection(color);
     FragColor = vec4(color, 1.0);

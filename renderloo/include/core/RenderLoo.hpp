@@ -20,8 +20,8 @@
 #include "core/Light.hpp"
 #include "core/Skybox.hpp"
 
+#include "antialias/AA.hpp"
 #include "core/FinalProcess.hpp"
-#include "core/constants.hpp"
 
 enum RenderFlag {
     RenderFlag_Opaque = 1 << 0,
@@ -60,7 +60,7 @@ class RenderLoo : public loo::Application {
     void transparentPass();
 
     // seventh pass: merge all effects
-    void finalScreenPass();
+    void finalScreenPass(const loo::Texture2D& texture);
     void keyboard();
     void mouse();
     void saveScreenshot(std::filesystem::path filename) const;
@@ -96,8 +96,10 @@ class RenderLoo : public loo::Application {
     // transparent pass
     loo::Framebuffer m_transparentfb;
     loo::ShaderProgram m_transparentShader;
-    // skybox
-    std::unique_ptr<loo::Texture2D> m_skyboxresult;
+
+    // antialias
+    AntiAliasMethod m_antialiasmethod{AntiAliasMethod::None};
+    SMAA m_smaa;
 
     // process
     FinalProcess m_finalprocess;

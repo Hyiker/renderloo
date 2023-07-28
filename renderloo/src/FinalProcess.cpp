@@ -17,9 +17,7 @@ FinalProcess::FinalProcess(int width, int height)
 void FinalProcess::init() {
     panicPossibleGLError();
 }
-void FinalProcess::render(const loo::Texture2D& deferredTexture,
-                          const loo::Texture2D& GBuffer3,
-                          const loo::Texture2D& skyboxTexture) {
+void FinalProcess::render(const loo::Texture2D& deferredTexture) {
     Framebuffer::bindDefault();
     glClearColor(0, 0, 0, 1);
     glDisable(GL_DEPTH_TEST);
@@ -28,8 +26,6 @@ void FinalProcess::render(const loo::Texture2D& deferredTexture,
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     m_shader.use();
     m_shader.setTexture(0, deferredTexture);
-    m_shader.setTexture(4, skyboxTexture);
-    m_shader.setTexture(5, GBuffer3);
 
     Quad::globalQuad().draw();
 

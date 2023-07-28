@@ -21,11 +21,7 @@ class FinalProcess {
    public:
     FinalProcess(int width, int height);
     void init();
-    // if use direct output, this pass will just out put the previous rendering
-    // result without doing any addition postprocessing
-    void render(const loo::Texture2D& deferredTexture,
-                const loo::Texture2D& GBuffer3,
-                const loo::Texture2D& skyboxTexture);
+    void render(const loo::Texture2D& deferredTexture);
 };
 
 #endif /* HDSSS_INCLUDE_FINAL_PROCESS_HPP */
