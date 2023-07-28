@@ -111,6 +111,9 @@ void RenderLoo::loadModel(const std::string& filename) {
 
     m_scene.prepare();
     AABB sceneAABB = m_scene.computeAABBWorldSpace();
+    glm::vec3 diagonal = sceneAABB.getDiagonal();
+    LOG(INFO) << "diagnal: " << glm::to_string(diagonal) << endl;
+    LOG(INFO) << "diagnal length: " << glm::length(diagonal) << endl;
     m_maincam = placeCameraBySceneAABB(sceneAABB);
     LOG(INFO) << "Load done" << endl;
 }
@@ -128,6 +131,7 @@ RenderLoo::RenderLoo(int width, int height)
                 100.0),
       m_shadowmapshader{Shader(SHADOWMAP_VERT, ShaderType::Vertex),
                         Shader(SHADOWMAP_FRAG, ShaderType::Fragment)},
+      m_ssao(getWidth(), getHeight()),
       m_deferredshader{Shader(DEFERRED_VERT, ShaderType::Vertex),
                        Shader(DEFERRED_FRAG, ShaderType::Fragment)},
       m_transparentShader({
@@ -141,6 +145,7 @@ RenderLoo::RenderLoo(int width, int height)
 
     initGBuffers();
     initShadowMap();
+    m_ssao.init(m_gbuffers.depthStencilRb);
     initDeferredPass();
     initTransparentPass();
     m_smaa.init();
@@ -152,7 +157,7 @@ RenderLoo::RenderLoo(int width, int height)
         sun.setPosition(vec3(0, 10.0, 0));
         sun.setDirection(vec3(0, -1, 0));
         sun.color = vec4(1.0);
-        sun.intensity = 1.0;
+        sun.intensity = 0.0;
         sun.setType(LightType::DIRECTIONAL);
         m_lights.push_back(sun);
     }
@@ -197,13 +202,15 @@ void RenderLoo::initGBuffers() {
 
     panicPossibleGLError();
 
-    m_gbuffers.depthrb.init(GL_DEPTH24_STENCIL8, getWidth(), getHeight());
+    m_gbuffers.depthStencilRb.init(GL_DEPTH24_STENCIL8, getWidth(),
+                                   getHeight());
 
     m_gbufferfb.attachTexture(*m_gbuffers.position, GL_COLOR_ATTACHMENT0, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.bufferA, GL_COLOR_ATTACHMENT1, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.bufferB, GL_COLOR_ATTACHMENT2, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.bufferC, GL_COLOR_ATTACHMENT3, 0);
-    m_gbufferfb.attachRenderbuffer(m_gbuffers.depthrb, GL_DEPTH_ATTACHMENT);
+    m_gbufferfb.attachRenderbuffer(m_gbuffers.depthStencilRb,
+                                   GL_DEPTH_ATTACHMENT);
 }
 
 void RenderLoo::initShadowMap() {
@@ -229,7 +236,8 @@ void RenderLoo::initDeferredPass() {
     m_deferredResult->setSizeFilter(GL_LINEAR, GL_LINEAR);
 
     m_deferredfb.attachTexture(*m_deferredResult, GL_COLOR_ATTACHMENT0, 0);
-    m_deferredfb.attachRenderbuffer(m_gbuffers.depthrb, GL_DEPTH_ATTACHMENT);
+    m_deferredfb.attachRenderbuffer(m_gbuffers.depthStencilRb,
+                                    GL_DEPTH_ATTACHMENT);
     panicPossibleGLError();
 }
 
@@ -237,7 +245,8 @@ void RenderLoo::initTransparentPass() {
 
     m_transparentfb.init();
     m_transparentfb.attachTexture(*m_deferredResult, GL_COLOR_ATTACHMENT0, 0);
-    m_transparentfb.attachRenderbuffer(m_gbuffers.depthrb, GL_DEPTH_ATTACHMENT);
+    m_transparentfb.attachRenderbuffer(m_gbuffers.depthStencilRb,
+                                       GL_DEPTH_ATTACHMENT);
     panicPossibleGLError();
 }
 void RenderLoo::saveScreenshot(fs::path filename) const {
@@ -318,6 +327,15 @@ void RenderLoo::gui() {
                 const char* antialiasmethod[] = {"None", "SMAA"};
                 ImGui::Combo("Antialias", (int*)(&m_antialiasmethod),
                              antialiasmethod, IM_ARRAYSIZE(antialiasmethod));
+                const char* ambientocclusionmethod[] = {"None", "SSAO", "HBAO",
+                                                        "GTAO"};
+                ImGui::Combo("Ambient occlusion", (int*)(&m_aomethod),
+                             ambientocclusionmethod,
+                             IM_ARRAYSIZE(ambientocclusionmethod));
+                if (m_aomethod == AOMethod::SSAO) {
+                    ImGui::SliderFloat("bias", &m_ssao.bias, 0.0, 0.5);
+                    ImGui::SliderFloat("radius", &m_ssao.radius, 0.0, 1.0);
+                }
             }
             // Resources
             if (ImGui::CollapsingHeader("Assets",
@@ -434,12 +452,17 @@ void RenderLoo::gbufferPass() {
     m_gbufferfb.enableAttachments({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
                                    GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3});
 
-    clear();
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_STENCIL_TEST);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    glStencilMask(0xFF);
 
     m_baseshader.use();
     scene(m_baseshader, RenderFlag_Opaque);
 
     m_gbufferfb.unbind();
+    glStencilMask(0x00);
+    glDisable(GL_STENCIL_TEST);
     endEvent();
 }
 
@@ -491,6 +514,10 @@ void RenderLoo::deferredPass() {
     m_deferredshader.setTexture(5, m_skybox.getDiffuseConv());
     m_deferredshader.setTexture(6, m_skybox.getSpecularConv());
     m_deferredshader.setTexture(7, m_skybox.getBRDFLUT());
+    const loo::Texture2D& aoTex = m_aomethod == AOMethod::SSAO
+                                      ? m_ssao.getAOTexture()
+                                      : Texture2D::getWhiteTexture();
+    m_deferredshader.setTexture(8, aoTex);
     m_deferredshader.setUniform("mainLightMatrix",
                                 m_lights[0].getLightSpaceMatrix());
 
@@ -604,6 +631,9 @@ void RenderLoo::loop() {
         gbufferPass();
 
         shadowMapPass();
+
+        if (m_aomethod == AOMethod::SSAO)
+            m_ssao.render(*this, *m_gbuffers.position, *m_gbuffers.bufferC);
 
         deferredPass();
 

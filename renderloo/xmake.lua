@@ -11,6 +11,7 @@ target("renderloo_shaders")
 
     add_files("shaders/*.*", "shaders/SMAA/*.*")
     remove_files("shaders/SMAA/SMAA.hlsl")
+    set_policy("build.across_targets_in_parallel", false)
 
 target("renderloo_lib")
     set_kind("static")

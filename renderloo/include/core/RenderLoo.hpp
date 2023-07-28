@@ -21,6 +21,7 @@
 #include "core/Skybox.hpp"
 
 #include "antialias/AA.hpp"
+#include "ao/AO.hpp"
 #include "core/FinalProcess.hpp"
 
 enum RenderFlag {
@@ -84,9 +85,12 @@ class RenderLoo : public loo::Application {
         std::unique_ptr<loo::Texture2D> bufferB;
         // normal(3) + roughness(1)
         std::unique_ptr<loo::Texture2D> bufferC;
-        loo::Renderbuffer depthrb;
+        loo::Renderbuffer depthStencilRb;
     } m_gbuffers;
     loo::Framebuffer m_gbufferfb;
+    // ambient occlusion
+    AOMethod m_aomethod{AOMethod::SSAO};
+    SSAO m_ssao;
     // deferred pass
     loo::ShaderProgram m_deferredshader;
     loo::Framebuffer m_deferredfb;

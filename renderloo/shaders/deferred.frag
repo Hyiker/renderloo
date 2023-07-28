@@ -14,6 +14,7 @@ layout(binding = 4) uniform sampler2D MainLightShadowMap;
 layout(binding = 5) uniform samplerCube DiffuseConvolved;
 layout(binding = 6) uniform samplerCube SpecularConvolved;
 layout(binding = 7) uniform sampler2D BRDFLUT;
+layout(binding = 8) uniform sampler2D AmbientOcclusion;
 
 uniform mat4 mainLightMatrix;
 uniform vec3 cameraPosition;
@@ -38,7 +39,8 @@ void main() {
     baseColor = texture(GBufferA, texCoord).rgb;
     metallic = texture(GBufferB, texCoord).r;
     roughness = texture(GBufferC, texCoord).a;
-    occlusion = texture(GBufferB, texCoord).a;
+    occlusion =
+        texture(GBufferB, texCoord).a * texture(AmbientOcclusion, texCoord).r;
     if (length(normalWS) < 1e-5) {
         return;
     }
@@ -77,5 +79,6 @@ void main() {
         computePBRMetallicRoughnessIBLDiffuse(surface, DiffuseConvolved, V);
     envSpecular = computePBRMetallicRoughnessIBLSpecular(
         surface, SpecularConvolved, BRDFLUT, V);
-    FragResult = vec4(envDiffuse + diffuse + envSpecular + specular, 1.0);
+    vec3 color = (envDiffuse + envSpecular) * occlusion + diffuse + specular;
+    FragResult = vec4(color, 1.0);
 }
