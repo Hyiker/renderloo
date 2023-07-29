@@ -71,10 +71,12 @@ static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn) {
 
     lastX = xpos;
     lastY = ypos;
-    if (rightPressing)
-        myapp->getCamera().rotateCamera(xoffset, yoffset);
-    else if (leftPressing)
-        myapp->getCamera().stareRotate(xoffset, yoffset);
+    if (rightPressing && myapp->getMainCameraMode() == CameraMode::FPS)
+        dynamic_cast<FPSCamera&>(myapp->getMainCamera())
+            .rotateCamera(xoffset, yoffset);
+    else if (leftPressing && myapp->getMainCameraMode() == CameraMode::ArcBall)
+        dynamic_cast<ArcBallCamera&>(myapp->getMainCamera())
+            .orbitCamera(xoffset, yoffset);
 }
 
 static void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
@@ -83,19 +85,26 @@ static void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
         return;
     }
     auto myapp = static_cast<RenderLoo*>(glfwGetWindowUserPointer(window));
-    myapp->getCamera().processMouseScroll(xOffset, yOffset);
+    myapp->getMainCamera().zoomCamera(yOffset);
 }
-static Camera placeCameraBySceneAABB(const AABB& aabb) {
+static std::unique_ptr<loo::PerspectiveCamera> placeCameraBySceneAABB(
+    const AABB& aabb, CameraMode mode) {
     vec3 center = aabb.getCenter();
     vec3 diagonal = aabb.getDiagonal();
     float r = std::max(diagonal.x, diagonal.y) / 2.0;
-    float fov = glm::radians(60.f);
-    float dist = r / sin(fov / 2.0);
+    float fov = 60.f;
+    float dist = r / sin(glm::radians(fov) / 2.0);
     float overlookAngle = glm::radians(45.f);
     float y = dist * tan(overlookAngle);
     vec3 pos = center + vec3(0, y, dist);
-
-    return Camera(pos, center, fov, 0.01, std::max(100.0f, dist + r));
+    if (mode == CameraMode::FPS)
+        return std::make_unique<FPSCamera>(pos, center, vec3(0, 1, 0), 0.01,
+                                           std::max(100.0f, dist + r), fov);
+    else if (mode == CameraMode::ArcBall)
+        return std::make_unique<ArcBallCamera>(pos, center, vec3(0, 1, 0), 0.01,
+                                               std::max(100.0f, dist + r), fov);
+    else
+        return nullptr;
 }
 
 void RenderLoo::loadModel(const std::string& filename) {
@@ -114,7 +123,7 @@ void RenderLoo::loadModel(const std::string& filename) {
     glm::vec3 diagonal = sceneAABB.getDiagonal();
     LOG(INFO) << "diagnal: " << glm::to_string(diagonal) << endl;
     LOG(INFO) << "diagnal length: " << glm::length(diagonal) << endl;
-    m_maincam = placeCameraBySceneAABB(sceneAABB);
+    m_mainCamera = placeCameraBySceneAABB(sceneAABB, m_cameraMode);
     LOG(INFO) << "Load done" << endl;
 }
 
@@ -127,8 +136,7 @@ RenderLoo::RenderLoo(int width, int height)
       m_baseshader{Shader(GBUFFER_VERT, ShaderType::Vertex),
                    Shader(GBUFFER_FRAG, ShaderType::Fragment)},
       m_scene(),
-      m_maincam(vec3(0, 0, 0.15), vec3(0, 0, 0), glm::radians(45.f), 0.01,
-                100.0),
+      m_mainCamera(),
       m_shadowmapshader{Shader(SHADOWMAP_VERT, ShaderType::Vertex),
                         Shader(SHADOWMAP_FRAG, ShaderType::Fragment)},
       m_ssao(getWidth(), getHeight()),
@@ -319,6 +327,30 @@ void RenderLoo::gui() {
                                        (float*)&m_lights[0].intensity, 0.0,
                                        100.0);
                 }
+            // Camera
+            if (ImGui::CollapsingHeader("Camera",
+                                        ImGuiTreeNodeFlags_DefaultOpen)) {
+                const char* cameraMode[] = {"FPS", "ArcBall"};
+                if (ImGui::Combo("Mode", (int*)(&m_cameraMode), cameraMode,
+                                 IM_ARRAYSIZE(cameraMode))) {
+                    if (m_cameraMode == CameraMode::FPS) {
+                        m_mainCamera = make_unique<FPSCamera>(*m_mainCamera);
+                    } else if (m_cameraMode == CameraMode::ArcBall) {
+                        auto arcballCam =
+                            make_unique<ArcBallCamera>(*m_mainCamera);
+                        arcballCam->setCenter(
+                            m_scene.computeAABBWorldSpace().getCenter());
+                        m_mainCamera = std::move(arcballCam);
+                    }
+                }
+                ImGui::TextWrapped(
+                    "General info: \n\tPosition: (%.2f, %.2f, "
+                    "%.2f)\n\tDirection: (%.2f, %.2f, %.2f)",
+                    m_mainCamera->position.x, m_mainCamera->position.y,
+                    m_mainCamera->position.z, m_mainCamera->getDirection().x,
+                    m_mainCamera->getDirection().y,
+                    m_mainCamera->getDirection().z);
+            }
             // OpenGL option
             if (ImGui::CollapsingHeader("Render options",
                                         ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -437,7 +469,7 @@ void RenderLoo::skyboxPass() {
     glDisable(GL_CULL_FACE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glm::mat4 view;
-    m_maincam.getViewMatrix(view);
+    m_mainCamera->getViewMatrix(view);
     m_skybox.draw(view);
     glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
@@ -521,7 +553,7 @@ void RenderLoo::deferredPass() {
     m_deferredshader.setUniform("mainLightMatrix",
                                 m_lights[0].getLightSpaceMatrix());
 
-    m_deferredshader.setUniform("cameraPosition", m_maincam.getPosition());
+    m_deferredshader.setUniform("cameraPosition", m_mainCamera->position);
 
     ShaderProgram::getUniformBlock(SHADER_UB_PORT_LIGHTS)
         .mapBufferScoped<ShaderLightBlock>([&](ShaderLightBlock& lights) {
@@ -550,7 +582,7 @@ void RenderLoo::transparentPass() {
     m_transparentShader.setTexture(21, m_skybox.getSpecularConv());
     m_transparentShader.setTexture(22, m_skybox.getBRDFLUT());
     m_transparentShader.setTexture(23, *m_mainlightshadowmap);
-    m_transparentShader.setUniform("cameraPosition", m_maincam.getPosition());
+    m_transparentShader.setUniform("cameraPosition", m_mainCamera->position);
     m_transparentShader.setUniform("mainLightMatrix",
                                    m_lights[0].getLightSpaceMatrix());
 
@@ -570,8 +602,8 @@ void RenderLoo::scene(loo::ShaderProgram& shader, RenderFlag flag) {
     glEnable(GL_DEPTH_TEST);
     ShaderProgram::getUniformBlock(SHADER_UB_PORT_MVP)
         .mapBufferScoped<MVP>([this](MVP& mvp) {
-            m_maincam.getViewMatrix(mvp.view);
-            m_maincam.getProjectionMatrix(mvp.projection);
+            m_mainCamera->getViewMatrix(mvp.view);
+            m_mainCamera->getProjectionMatrix(mvp.projection);
         });
 
     logPossibleGLError();
@@ -596,16 +628,15 @@ void RenderLoo::clear() {
 }
 void RenderLoo::keyboard() {
     if (keyForward())
-        m_maincam.processKeyboard(CameraMovement::FORWARD, getFrameDeltaTime());
+        m_mainCamera->moveCamera(CameraMovement::FORWARD, getFrameDeltaTime());
     if (keyBackward())
-        m_maincam.processKeyboard(CameraMovement::BACKWARD,
-                                  getFrameDeltaTime());
+        m_mainCamera->moveCamera(CameraMovement::BACKWARD, getFrameDeltaTime());
     if (keyLeft())
-        m_maincam.processKeyboard(CameraMovement::LEFT, getFrameDeltaTime());
+        m_mainCamera->moveCamera(CameraMovement::LEFT, getFrameDeltaTime());
     if (keyRight())
-        m_maincam.processKeyboard(CameraMovement::RIGHT, getFrameDeltaTime());
+        m_mainCamera->moveCamera(CameraMovement::RIGHT, getFrameDeltaTime());
     if (glfwGetKey(getWindow(), GLFW_KEY_R)) {
-        m_maincam = Camera();
+        m_mainCamera = placeCameraBySceneAABB(m_scene.aabb, m_cameraMode);
     }
     static bool h_pressed = false;
     if (glfwGetKey(getWindow(), GLFW_KEY_H) == GLFW_PRESS) {
@@ -620,7 +651,7 @@ void RenderLoo::mouse() {
     glfwSetScrollCallback(getWindow(), scrollCallback);
 }
 void RenderLoo::loop() {
-    m_maincam.m_aspect = getWindowRatio();
+    m_mainCamera->setAspect(getWindowRatio());
     // render
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);

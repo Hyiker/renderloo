@@ -29,6 +29,7 @@ enum RenderFlag {
     RenderFlag_Transparent = 1 << 1,
     RenderFlag_All = RenderFlag_Opaque | RenderFlag_Transparent
 };
+enum class CameraMode : int { FPS, ArcBall };
 
 class RenderLoo : public loo::Application {
    public:
@@ -36,7 +37,8 @@ class RenderLoo : public loo::Application {
     // only load model
     void loadModel(const std::string& filename);
     void loadSkybox(const std::string& filename);
-    loo::Camera& getCamera() { return m_maincam; }
+    loo::PerspectiveCamera& getMainCamera() { return *m_mainCamera; }
+    auto getMainCameraMode() const { return m_cameraMode; }
     void afterCleanup() override;
     void convertMaterial();
     void clear();
@@ -69,7 +71,10 @@ class RenderLoo : public loo::Application {
     loo::ShaderProgram m_baseshader;
     loo::Scene m_scene;
     Skybox m_skybox;
-    loo::Camera m_maincam;
+
+    CameraMode m_cameraMode{CameraMode::ArcBall};
+    std::unique_ptr<loo::PerspectiveCamera> m_mainCamera;
+
     std::vector<ShaderLight> m_lights;
 
     std::shared_ptr<loo::Texture2D> m_mainlightshadowmap;
