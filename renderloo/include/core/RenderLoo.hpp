@@ -28,6 +28,7 @@
 enum RenderFlag {
     RenderFlag_Opaque = 1 << 0,
     RenderFlag_Transparent = 1 << 1,
+    RenderFlag_Z01 = 1 << 2,
     RenderFlag_All = RenderFlag_Opaque | RenderFlag_Transparent
 };
 enum class CameraMode : int { FPS, ArcBall };

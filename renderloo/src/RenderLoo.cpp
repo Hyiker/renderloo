@@ -99,13 +99,13 @@ static std::unique_ptr<loo::PerspectiveCamera> placeCameraBySceneAABB(
     float y = dist * tan(overlookAngle);
     vec3 pos = center + vec3(0, y, dist);
     if (mode == CameraMode::FPS)
-        return std::make_unique<FPSCamera>(pos, center, vec3(0, 1, 0), 0.1,
+        return std::make_unique<FPSCamera>(pos, center, vec3(0, 1, 0), 0.01f,
                                            std::max(100.0f, dist + r),
                                            EXPECTED_FOV);
     else if (mode == CameraMode::ArcBall)
-        return std::make_unique<ArcBallCamera>(pos, center, vec3(0, 1, 0), 0.1,
-                                               std::max(100.0f, dist + r),
-                                               EXPECTED_FOV);
+        return std::make_unique<ArcBallCamera>(
+            pos, center, vec3(0, 1, 0), 0.01f, std::max(100.0f, dist + r),
+            EXPECTED_FOV);
     else
         return nullptr;
 }
@@ -185,6 +185,8 @@ RenderLoo::RenderLoo(int width, int height)
     // init bone uniform buffer
     ShaderProgram::initUniformBlock(std::make_unique<UniformBuffer>(
         SHADER_UB_PORT_BONES, sizeof(mat4) * BONES_MAX_COUNT));
+
+    { glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE); }
 
     NFD_Init();
 }
@@ -497,7 +499,7 @@ void RenderLoo::skyboxPass() {
     m_deferredfb.enableAttachments({GL_COLOR_ATTACHMENT0});
     glEnable(GL_DEPTH_TEST);
 
-    glDepthFunc(GL_LEQUAL);
+    glDepthFunc(GL_GEQUAL);
     glDisable(GL_CULL_FACE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glm::mat4 view;
@@ -517,16 +519,24 @@ void RenderLoo::gbufferPass() {
                                    GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3});
 
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_GREATER);
     glEnable(GL_STENCIL_TEST);
+
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glClearDepth(0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glStencilMask(0xFF);
 
     m_baseshader.use();
-    scene(m_baseshader, RenderFlag_Opaque);
+    scene(m_baseshader, (RenderFlag)(RenderFlag_Opaque | RenderFlag_Z01));
 
     m_gbufferfb.unbind();
     glStencilMask(0x00);
     glDisable(GL_STENCIL_TEST);
+    glDisable(GL_CULL_FACE);
+    glDepthFunc(GL_LESS);
+    glDisable(GL_DEPTH_TEST);
     endEvent();
 }
 
@@ -598,6 +608,7 @@ void RenderLoo::deferredPass() {
     glDisable(GL_DEPTH_TEST);
     Quad::globalQuad().draw();
     glEnable(GL_DEPTH_TEST);
+
     endEvent();
 }
 
@@ -621,21 +632,23 @@ void RenderLoo::transparentPass() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_GREATER);
     glDepthMask(GL_FALSE);
     scene(m_transparentShader, RenderFlag_Transparent);
 
     m_gbufferfb.unbind();
     glDisable(GL_BLEND);
     glDepthMask(GL_TRUE);
+    glDepthFunc(GL_LESS);
     endEvent();
 }
 
 void RenderLoo::scene(loo::ShaderProgram& shader, RenderFlag flag) {
-    glEnable(GL_DEPTH_TEST);
     ShaderProgram::getUniformBlock(SHADER_UB_PORT_MVP)
-        .mapBufferScoped<MVP>([this](MVP& mvp) {
+        .mapBufferScoped<MVP>([this, flag](MVP& mvp) {
             m_mainCamera->getViewMatrix(mvp.view);
-            m_mainCamera->getProjectionMatrix(mvp.projection);
+            m_mainCamera->getProjectionMatrix(mvp.projection,
+                                              flag & RenderFlag_Z01);
         });
 
     logPossibleGLError();
