@@ -15,7 +15,7 @@ class SSAO {
                 const loo::Texture2D& normal);
     const loo::Texture2D& getAOTexture() const { return *m_result; }
 
-    float bias = 0.03f, radius = 0.1f;
+    float bias = 0.03f, radius = 0.5f;
 
    private:
     void initRandomTexture();

@@ -99,13 +99,13 @@ static std::unique_ptr<loo::PerspectiveCamera> placeCameraBySceneAABB(
     float y = dist * tan(overlookAngle);
     vec3 pos = center + vec3(0, y, dist);
     if (mode == CameraMode::FPS)
-        return std::make_unique<FPSCamera>(pos, center, vec3(0, 1, 0), 0.001,
+        return std::make_unique<FPSCamera>(pos, center, vec3(0, 1, 0), 0.1,
                                            std::max(100.0f, dist + r),
                                            EXPECTED_FOV);
     else if (mode == CameraMode::ArcBall)
-        return std::make_unique<ArcBallCamera>(
-            pos, center, vec3(0, 1, 0), 0.001, std::max(100.0f, dist + r),
-            EXPECTED_FOV);
+        return std::make_unique<ArcBallCamera>(pos, center, vec3(0, 1, 0), 0.1,
+                                               std::max(100.0f, dist + r),
+                                               EXPECTED_FOV);
     else
         return nullptr;
 }
@@ -113,7 +113,9 @@ static std::unique_ptr<loo::PerspectiveCamera> placeCameraBySceneAABB(
 void RenderLoo::loadModel(const std::string& filename) {
     LOG(INFO) << "Loading model from " << filename << endl;
     m_scene.clear();
-    auto meshes = createMeshFromFile(filename, m_scene.modelName);
+    auto meshes =
+        createMeshesFromFile(m_scene.boneMap, m_scene.boneMatrices, &m_animator,
+                             filename, m_scene.modelName);
     m_scene.addMeshes(std::move(meshes));
     if (m_scene.modelName.empty()) {
         fs::path p(filename);
@@ -179,6 +181,10 @@ RenderLoo::RenderLoo(int width, int height)
     ShaderProgram::initUniformBlock(
         std::make_unique<UniformBuffer>(SHADER_UB_PORT_MVP, sizeof(MVP)));
     panicPossibleGLError();
+
+    // init bone uniform buffer
+    ShaderProgram::initUniformBlock(std::make_unique<UniformBuffer>(
+        SHADER_UB_PORT_BONES, sizeof(mat4) * BONES_MAX_COUNT));
 
     NFD_Init();
 }
@@ -325,6 +331,11 @@ void RenderLoo::gui() {
                     "Scene meshes: %d\n"
                     "Scene triangles: %d%s",
                     (int)m_scene.countMesh(), triangleCount, base);
+                bool hasAnimation = m_animator.hasAnimation();
+                ImGui::TextColored(
+                    ImVec4(hasAnimation ? 0.0f : 1.0f,
+                           hasAnimation ? 1.0f : 0.0f, 0.0f, 1.0f),
+                    "Animation: %s", hasAnimation ? "Yes" : "No");
             }
         }
     }
@@ -683,6 +694,8 @@ void RenderLoo::loop() {
     glViewport(0, 0, getWidth(), getHeight());
 
     {
+        animation();
+
         gbufferPass();
 
         shadowMapPass();
@@ -714,6 +727,15 @@ void RenderLoo::loop() {
     mouse();
 
     gui();
+}
+
+void RenderLoo::animation() {
+    if (!m_animator.hasAnimation())
+        return;
+    m_animator.updateAnimation(getDeltaTime());
+    auto& ub = ShaderProgram::getUniformBlock(SHADER_UB_PORT_BONES);
+    ub.updateData(m_animator.finalBoneMatrices.data());
+    panicPossibleGLError();
 }
 
 void RenderLoo::afterCleanup() {

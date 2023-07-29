@@ -17,7 +17,6 @@ layout(location = 2) out vec4 GBufferB;
 layout(location = 3) out vec4 GBufferC;
 
 uniform vec3 uCameraPosition;
-
 uniform bool enableNormal;
 uniform bool enableParallax;
 #ifdef MATERIAL_PBR

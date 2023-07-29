@@ -7,6 +7,9 @@ constexpr int SHADER_UB_PORT_MVP = 0;
 // light binding
 constexpr int SHADER_UB_PORT_LIGHTS = 1;
 
+// bone binding
+constexpr int SHADER_UB_PORT_BONES = 2;
+
 constexpr int SHADER_BINDING_PORT_MATERIAL_NORMAL = 7;
 
 // simple material binding

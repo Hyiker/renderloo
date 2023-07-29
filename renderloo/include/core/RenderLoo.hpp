@@ -20,6 +20,7 @@
 #include "core/Light.hpp"
 #include "core/Skybox.hpp"
 
+#include <loo/Animation.hpp>
 #include "antialias/AA.hpp"
 #include "ao/AO.hpp"
 #include "core/FinalProcess.hpp"
@@ -50,6 +51,7 @@ class RenderLoo : public loo::Application {
     void initTransparentPass();
 
     void loop() override;
+    void animation();
     void gui();
     void scene(loo::ShaderProgram& shader, RenderFlag flag = RenderFlag_All);
     void skyboxPass();
@@ -117,6 +119,8 @@ class RenderLoo : public loo::Application {
     bool m_screenshotflag{false};
 
     FinalPassOptions m_finalpassoptions;
+
+    loo::Animator m_animator{nullptr};
 };
 
 #endif /* RENDERLOO_INCLUDE_CORE_RENDER_LOO_HPP */
