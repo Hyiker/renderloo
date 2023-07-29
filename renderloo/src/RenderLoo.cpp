@@ -92,17 +92,19 @@ static std::unique_ptr<loo::PerspectiveCamera> placeCameraBySceneAABB(
     vec3 center = aabb.getCenter();
     vec3 diagonal = aabb.getDiagonal();
     float r = std::max(diagonal.x, diagonal.y) / 2.0;
-    float fov = 60.f;
-    float dist = r / sin(glm::radians(fov) / 2.0);
+    constexpr float EXPECTED_FOV = 90.f;
+    float dist = r / sin(glm::radians(EXPECTED_FOV) / 2.0);
     float overlookAngle = glm::radians(45.f);
     float y = dist * tan(overlookAngle);
     vec3 pos = center + vec3(0, y, dist);
     if (mode == CameraMode::FPS)
-        return std::make_unique<FPSCamera>(pos, center, vec3(0, 1, 0), 0.01,
-                                           std::max(100.0f, dist + r), fov);
+        return std::make_unique<FPSCamera>(pos, center, vec3(0, 1, 0), 0.001,
+                                           std::max(100.0f, dist + r),
+                                           EXPECTED_FOV);
     else if (mode == CameraMode::ArcBall)
-        return std::make_unique<ArcBallCamera>(pos, center, vec3(0, 1, 0), 0.01,
-                                               std::max(100.0f, dist + r), fov);
+        return std::make_unique<ArcBallCamera>(
+            pos, center, vec3(0, 1, 0), 0.001, std::max(100.0f, dist + r),
+            EXPECTED_FOV);
     else
         return nullptr;
 }
@@ -345,11 +347,12 @@ void RenderLoo::gui() {
                 }
                 ImGui::TextWrapped(
                     "General info: \n\tPosition: (%.2f, %.2f, "
-                    "%.2f)\n\tDirection: (%.2f, %.2f, %.2f)",
+                    "%.2f)\n\tDirection: (%.2f, %.2f, %.2f)\n\tFOV(°): %.2f",
                     m_mainCamera->position.x, m_mainCamera->position.y,
                     m_mainCamera->position.z, m_mainCamera->getDirection().x,
                     m_mainCamera->getDirection().y,
-                    m_mainCamera->getDirection().z);
+                    m_mainCamera->getDirection().z,
+                    glm::degrees(m_mainCamera->getFov()));
             }
             // OpenGL option
             if (ImGui::CollapsingHeader("Render options",
@@ -361,8 +364,7 @@ void RenderLoo::gui() {
                              antialiasmethod, IM_ARRAYSIZE(antialiasmethod));
                 const char* ambientocclusionmethod[] = {"None", "SSAO", "HBAO",
                                                         "GTAO"};
-                ImGui::Combo("Ambient occlusion", (int*)(&m_aomethod),
-                             ambientocclusionmethod,
+                ImGui::Combo("AO", (int*)(&m_aomethod), ambientocclusionmethod,
                              IM_ARRAYSIZE(ambientocclusionmethod));
                 if (m_aomethod == AOMethod::SSAO) {
                     ImGui::SliderFloat("bias", &m_ssao.bias, 0.0, 0.5);
