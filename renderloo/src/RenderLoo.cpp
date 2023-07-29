@@ -9,6 +9,7 @@
 #include <locale>
 #include <loo/glError.hpp>
 #include <memory>
+#include <thread>
 #include <vector>
 #include "glm/gtx/string_cast.hpp"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -270,6 +271,21 @@ void RenderLoo::saveScreenshot(fs::path filename) const {
     panicPossibleGLError();
 }
 
+static void popupFileSelector(
+    const std::vector<nfdfilteritem_t>& filter, const nfdchar_t* defaultPath,
+    std::function<void(const std::string&)> cb,
+    std::function<void(nfdresult_t)> cancelCb = [](nfdresult_t) {}) {
+    nfdchar_t* outPath = nullptr;
+    nfdresult_t result =
+        NFD_OpenDialog(&outPath, filter.data(), filter.size(), defaultPath);
+    if (result == NFD_OKAY) {
+        cb(outPath);
+    } else {
+        cancelCb(result);
+    }
+    free(outPath);
+}
+
 void RenderLoo::gui() {
     auto& io = ImGui::GetIO();
     float h = io.DisplaySize.y;
@@ -345,6 +361,14 @@ void RenderLoo::gui() {
                         m_mainCamera = std::move(arcballCam);
                     }
                 }
+                if (m_cameraMode == CameraMode::ArcBall) {
+                    static float rotationDPS = 10.f;
+                    float deltaTime = getDeltaTime();
+                    ImGui::SliderFloat("Rotation Speed(°/s)", &rotationDPS, 0,
+                                       360);
+                    dynamic_cast<ArcBallCamera&>(*m_mainCamera)
+                        .orbitCameraAroundWorldUp(rotationDPS * deltaTime);
+                }
                 ImGui::TextWrapped(
                     "General info: \n\tPosition: (%.2f, %.2f, "
                     "%.2f)\n\tDirection: (%.2f, %.2f, %.2f)\n\tFOV(°): %.2f",
@@ -384,15 +408,12 @@ void RenderLoo::gui() {
                                      ImGuiInputTextFlags_ReadOnly);
                     ImGui::SameLine();
                     if (ImGui::Button("Load HDRI")) {
-                        nfdchar_t* outPath;
-                        nfdfilteritem_t filterItem[1] = {
-                            {"HDR Image", "hdr,exr"}};
-                        nfdresult_t result =
-                            NFD_OpenDialog(&outPath, filterItem, 1, nullptr);
-                        if (result == NFD_OKAY) {
-                            m_skybox.loadTexture(outPath);
-                            free(outPath);
-                        }
+                        pauseTime();
+                        popupFileSelector({{"HDR Image", "hdr,exr"}}, nullptr,
+                                          [this](const string& outPath) {
+                                              m_skybox.loadTexture(outPath);
+                                          });
+                        resumeTime();
                     }
                 }
                 {
@@ -402,16 +423,14 @@ void RenderLoo::gui() {
                         m_scene.modelName.size(), ImGuiInputTextFlags_ReadOnly);
                     ImGui::SameLine();
                     if (ImGui::Button("Load Model")) {
-                        nfdchar_t* outPath;
-                        nfdfilteritem_t filterItem[1] = {
-                            {"Model Files", "glb,gltf,obj,fbx"}};
-                        nfdresult_t result =
-                            NFD_OpenDialog(&outPath, filterItem, 1, nullptr);
-                        if (result == NFD_OKAY) {
-                            loadModel(outPath);
-                            convertMaterial();
-                            free(outPath);
-                        }
+                        pauseTime();
+                        popupFileSelector({{"Model Files", "glb,gltf,obj,fbx"}},
+                                          nullptr,
+                                          [this](const string& outPath) {
+                                              loadModel(outPath);
+                                              convertMaterial();
+                                          });
+                        resumeTime();
                     }
                 }
             }
@@ -630,13 +649,16 @@ void RenderLoo::clear() {
 }
 void RenderLoo::keyboard() {
     if (keyForward())
-        m_mainCamera->moveCamera(CameraMovement::FORWARD, getFrameDeltaTime());
+        m_mainCamera->moveCamera(CameraMovement::FORWARD,
+                                 getFrameTimeFromStart());
     if (keyBackward())
-        m_mainCamera->moveCamera(CameraMovement::BACKWARD, getFrameDeltaTime());
+        m_mainCamera->moveCamera(CameraMovement::BACKWARD,
+                                 getFrameTimeFromStart());
     if (keyLeft())
-        m_mainCamera->moveCamera(CameraMovement::LEFT, getFrameDeltaTime());
+        m_mainCamera->moveCamera(CameraMovement::LEFT, getFrameTimeFromStart());
     if (keyRight())
-        m_mainCamera->moveCamera(CameraMovement::RIGHT, getFrameDeltaTime());
+        m_mainCamera->moveCamera(CameraMovement::RIGHT,
+                                 getFrameTimeFromStart());
     if (glfwGetKey(getWindow(), GLFW_KEY_R)) {
         m_mainCamera = placeCameraBySceneAABB(m_scene.aabb, m_cameraMode);
     }
