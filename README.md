@@ -10,13 +10,11 @@ This is my OpenGL realtime rendering lab based on [loo](https://github.com/Hyike
 - [x] Physically based rendering
   - [x] Metallic-roughness workflow
   - [x] IBL
-  - [x] Depth-dependent transparency(sorting)
 - [x] Camera
   - [x] Perspective
     - [x] Arcball
     - [x] FPS
-- [x] Transparency
-  - [x] Alpha blending
+- [x] Transparency(2-pass method, alpha test+alpha blend)
 - [x] Shadow
   - [x] Main light PCF
 
