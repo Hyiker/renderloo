@@ -19,6 +19,7 @@
 #include <vector>
 #include "core/Light.hpp"
 #include "core/Skybox.hpp"
+#include "passes/TransparentPass.hpp"
 
 #include <loo/Animation.hpp>
 #include "antialias/AA.hpp"
@@ -28,7 +29,6 @@
 enum RenderFlag {
     RenderFlag_Opaque = 1 << 0,
     RenderFlag_Transparent = 1 << 1,
-    RenderFlag_Z01 = 1 << 2,
     RenderFlag_All = RenderFlag_Opaque | RenderFlag_Transparent
 };
 enum class CameraMode : int { FPS, ArcBall };
@@ -49,7 +49,6 @@ class RenderLoo : public loo::Application {
     void initGBuffers();
     void initShadowMap();
     void initDeferredPass();
-    void initTransparentPass();
 
     void loop() override;
     void animation();
@@ -62,8 +61,6 @@ class RenderLoo : public loo::Application {
     void shadowMapPass();
     // third pass: deferred pass(illumination)
     void deferredPass();
-    // fourth pass: transparent pass
-    void transparentPass();
 
     // seventh pass: merge all effects
     void finalScreenPass(const loo::Texture2D& texture);
@@ -105,9 +102,7 @@ class RenderLoo : public loo::Application {
     // diffuse
     std::shared_ptr<loo::Texture2D> m_deferredResult;
 
-    // transparent pass
-    loo::Framebuffer m_transparentfb;
-    loo::ShaderProgram m_transparentShader;
+    TransparentPass m_transparentPass;
 
     // antialias
     AntiAliasMethod m_antialiasmethod{AntiAliasMethod::SMAA};

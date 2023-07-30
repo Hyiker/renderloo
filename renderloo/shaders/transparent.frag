@@ -30,7 +30,6 @@ layout(binding = 22) uniform sampler2D BRDFLUT;
 layout(binding = 23) uniform sampler2D MainLightShadowMap;
 
 uniform vec3 cameraPosition;
-uniform bool enableNormal;
 uniform mat4 mainLightMatrix;
 
 layout(std140, binding = 1) uniform LightBlock {
@@ -48,15 +47,14 @@ void main() {
     // shading normal
     vec3 sNormal = texture(normalTex, texCoord).rgb;
     sNormal = length(sNormal) == 0.0 ? vNormal : (TBN * (sNormal * 2.0 - 1.0));
-    sNormal = normalize(enableNormal ? sNormal : vNormal);
-
-    vec3 baseColor =
-        texture(baseColorTex, texCoord).rgb * material.baseColor.rgb;
+    sNormal = normalize(sNormal);
+    vec4 baseColor4 = texture(baseColorTex, texCoord).rgba;
+    vec3 baseColor = baseColor4.rgb * material.baseColor.rgb;
     float metallic =
         texture(metallicTex, texCoord).r * material.metallicRoughness.r;
     float roughness =
         texture(roughnessTex, texCoord).r * material.metallicRoughness.g;
-    float alpha = material.baseColor.a;
+    float alpha = baseColor4.a * material.baseColor.a;
 
     vec3 V = normalize(cameraPosition - vPos);
     SurfaceParamsPBRMetallicRoughness surface;

@@ -13,6 +13,7 @@ mvp;
 
 void main() {
     vTexCoord = aPos;
-    gl_Position = (mvp.projection * mvp.view * vec4(aPos, 1.0)).xyww;
+    mat4 viewMod = mat4(mat3(mvp.view));
+    gl_Position = (mvp.projection * viewMod * vec4(aPos, 1.0)).xyww;
     gl_Position.z = 0.0;
 }

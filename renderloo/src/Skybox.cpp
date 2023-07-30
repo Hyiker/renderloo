@@ -261,11 +261,8 @@ void Skybox::loadTexture(const std::string& path) {
     this->path = path;
 }
 
-void Skybox::draw(glm::mat4 view) const {
+void Skybox::draw() const {
     m_shader.use();
-    ShaderProgram::getUniformBlock(SHADER_UB_PORT_MVP)
-        .mapBufferScoped<MVP>(
-            [&](MVP& mvp) { mvp.view = glm::mat4(glm::mat3(view)); });
     m_shader.setTexture(SHADER_SAMPLER_PORT_SKYBOX, getEnvmap());
     glBindVertexArray(vao);
     glDrawArrays(GL_TRIANGLES, 0, 36);

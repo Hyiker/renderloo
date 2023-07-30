@@ -43,7 +43,8 @@ std::shared_ptr<PBRMetallicMaterial> convertPBRMetallicMaterialFromBaseMaterial(
     const loo::BaseMaterial& baseMaterial) {
     const auto& pbrMetallic = baseMaterial.mrWorkFlow;
     auto metallicMaterial = std::make_shared<PBRMetallicMaterial>(
-        pbrMetallic.baseColor, pbrMetallic.metallic, pbrMetallic.roughness);
+        pbrMetallic.baseColor, pbrMetallic.metallic, pbrMetallic.roughness,
+        baseMaterial.flags);
     metallicMaterial->baseColorTex = pbrMetallic.baseColorTex;
     metallicMaterial->normalTex = baseMaterial.normalTex;
     metallicMaterial->metallicTex = pbrMetallic.metallicTex;

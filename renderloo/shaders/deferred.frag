@@ -2,7 +2,7 @@
 #extension GL_GOOGLE_include_directive : enable
 
 #include "include/lighting.glsl"
-layout(early_fragment_tests) in;
+
 layout(binding = 0) uniform sampler2D GBufferPosition;
 // base color(3) + unused(1)
 layout(binding = 1) uniform sampler2D GBufferA;

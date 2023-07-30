@@ -11,7 +11,7 @@ class Skybox {
    public:
     Skybox();
     void loadTexture(const std::string& path);
-    void draw(glm::mat4 view) const;
+    void draw() const;
     const loo::TextureCubeMap& getEnvmap() const {
         return m_envmap ? *m_envmap : loo::TextureCubeMap::getBlackTexture();
     }

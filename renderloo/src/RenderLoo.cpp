@@ -29,7 +29,6 @@
 #include "shaders/gbuffer.vert.hpp"
 #include "shaders/shadowmap.frag.hpp"
 #include "shaders/shadowmap.vert.hpp"
-#include "shaders/transparent.frag.hpp"
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/ext.hpp>
@@ -152,10 +151,6 @@ RenderLoo::RenderLoo(int width, int height)
       m_ssao(getWidth(), getHeight()),
       m_deferredshader{Shader(DEFERRED_VERT, ShaderType::Vertex),
                        Shader(DEFERRED_FRAG, ShaderType::Fragment)},
-      m_transparentShader({
-          Shader(GBUFFER_VERT, ShaderType::Vertex),
-          Shader(TRANSPARENT_FRAG, ShaderType::Fragment),
-      }),
       m_smaa(getWidth(), getHeight()),
       m_finalprocess(getWidth(), getHeight()) {
 
@@ -165,7 +160,7 @@ RenderLoo::RenderLoo(int width, int height)
     initShadowMap();
     m_ssao.init(m_gbuffers.depthStencilRb);
     initDeferredPass();
-    initTransparentPass();
+    m_transparentPass.init(m_gbuffers.depthStencilRb, *m_deferredResult);
     m_smaa.init();
 
     // final pass related
@@ -265,14 +260,6 @@ void RenderLoo::initDeferredPass() {
     panicPossibleGLError();
 }
 
-void RenderLoo::initTransparentPass() {
-
-    m_transparentfb.init();
-    m_transparentfb.attachTexture(*m_deferredResult, GL_COLOR_ATTACHMENT0, 0);
-    m_transparentfb.attachRenderbuffer(m_gbuffers.depthStencilRb,
-                                       GL_DEPTH_ATTACHMENT);
-    panicPossibleGLError();
-}
 void RenderLoo::saveScreenshot(fs::path filename) const {
     std::vector<unsigned char> pixels(getWidth() * getHeight() * 3);
     glReadPixels(0, 0, getWidth(), getHeight(), GL_RGB, GL_UNSIGNED_BYTE,
@@ -382,8 +369,7 @@ void RenderLoo::gui() {
                 if (m_cameraMode == CameraMode::ArcBall) {
                     static float rotationDPS = 10.f;
                     float deltaTime = getDeltaTime();
-                    ImGui::SliderFloat("Rotation Speed(°/s)", &rotationDPS, 0,
-                                       360);
+                    ImGui::SliderFloat("Rot(°/s)", &rotationDPS, 0, 360);
                     dynamic_cast<ArcBallCamera&>(*m_mainCamera)
                         .orbitCameraAroundWorldUp(rotationDPS * deltaTime);
                 }
@@ -509,7 +495,7 @@ void RenderLoo::skyboxPass() {
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glm::mat4 view;
     m_mainCamera->getViewMatrix(view);
-    m_skybox.draw(view);
+    m_skybox.draw();
     glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
 
@@ -527,14 +513,13 @@ void RenderLoo::gbufferPass() {
     glDepthFunc(GL_GREATER);
     glEnable(GL_STENCIL_TEST);
 
-    glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
     glClearDepth(0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glStencilMask(0xFF);
 
     m_baseshader.use();
-    scene(m_baseshader, (RenderFlag)(RenderFlag_Opaque | RenderFlag_Z01));
+    scene(m_baseshader, RenderFlag_Opaque);
 
     m_gbufferfb.unbind();
     glStencilMask(0x00);
@@ -564,7 +549,7 @@ void RenderLoo::shadowMapPass() {
     m_shadowmapshader.setUniform("lightSpaceMatrix", lightSpaceMatrix);
 
     for (auto mesh : m_scene.getMeshes()) {
-        if (mesh->isTransparent())
+        if (mesh->needAlphaBlend())
             continue;
         drawMesh(*mesh, m_scene.getModelMatrix(), m_shadowmapshader);
     }
@@ -617,46 +602,7 @@ void RenderLoo::deferredPass() {
     endEvent();
 }
 
-void RenderLoo::transparentPass() {
-    beginEvent("Transparent Pass");
-    // render gbuffer here
-    m_transparentfb.bind();
-
-    m_transparentfb.enableAttachments({GL_COLOR_ATTACHMENT0});
-
-    m_transparentShader.use();
-
-    m_transparentShader.setTexture(20, m_skybox.getDiffuseConv());
-    m_transparentShader.setTexture(21, m_skybox.getSpecularConv());
-    m_transparentShader.setTexture(22, m_skybox.getBRDFLUT());
-    m_transparentShader.setTexture(23, *m_mainlightshadowmap);
-    m_transparentShader.setUniform("cameraPosition", m_mainCamera->position);
-    m_transparentShader.setUniform("mainLightMatrix",
-                                   m_lights[0].getLightSpaceMatrix());
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_GREATER);
-    glDepthMask(GL_FALSE);
-    scene(m_transparentShader, RenderFlag_Transparent);
-
-    m_gbufferfb.unbind();
-    glDisable(GL_BLEND);
-    glDepthMask(GL_TRUE);
-    glDepthFunc(GL_LESS);
-    endEvent();
-}
-
 void RenderLoo::scene(loo::ShaderProgram& shader, RenderFlag flag) {
-    ShaderProgram::getUniformBlock(SHADER_UB_PORT_MVP)
-        .mapBufferScoped<MVP>([this, flag](MVP& mvp) {
-            m_mainCamera->getViewMatrix(mvp.view);
-            m_mainCamera->getProjectionMatrix(mvp.projection,
-                                              flag & RenderFlag_Z01);
-        });
-
-    logPossibleGLError();
     shader.use();
 
     shader.setUniform("enableNormal", m_enablenormal);
@@ -664,9 +610,17 @@ void RenderLoo::scene(loo::ShaderProgram& shader, RenderFlag flag) {
     bool renderOpaque = flag & RenderFlag_Opaque,
          renderTransparent = flag & RenderFlag_Transparent;
     for (auto mesh : m_scene.getMeshes()) {
-        if ((!mesh->isTransparent() && renderOpaque) ||
-            (mesh->isTransparent() && renderTransparent))
+        if ((!mesh->needAlphaBlend() && renderOpaque) ||
+            (mesh->needAlphaBlend() && renderTransparent)) {
+            if (mesh->isDoubleSided() || renderTransparent) {
+                glDisable(GL_CULL_FACE);
+            } else {
+                glEnable(GL_CULL_FACE);
+                glCullFace(GL_BACK);
+            }
+
             drawMesh(*mesh, m_scene.getModelMatrix(), m_baseshader);
+        }
     }
     logPossibleGLError();
 }
@@ -714,6 +668,13 @@ void RenderLoo::loop() {
     {
         animation();
 
+        // setup camera shader uniform block
+        ShaderProgram::getUniformBlock(SHADER_UB_PORT_MVP)
+            .mapBufferScoped<MVP>([this](MVP& mvp) {
+                m_mainCamera->getViewMatrix(mvp.view);
+                m_mainCamera->getProjectionMatrix(mvp.projection, true);
+            });
+
         gbufferPass();
 
         shadowMapPass();
@@ -725,7 +686,8 @@ void RenderLoo::loop() {
 
         skyboxPass();
 
-        transparentPass();
+        m_transparentPass.render(m_scene, m_skybox, *m_mainCamera,
+                                 *m_mainlightshadowmap, m_lights);
 
         if (m_antialiasmethod == AntiAliasMethod::SMAA) {
             beginEvent("SMAA Pass");
