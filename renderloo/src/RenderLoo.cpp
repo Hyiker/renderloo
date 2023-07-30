@@ -71,12 +71,26 @@ static void mouseCallback(GLFWwindow* window, double xposIn, double yposIn) {
 
     lastX = xpos;
     lastY = ypos;
-    if (rightPressing && myapp->getMainCameraMode() == CameraMode::FPS)
-        dynamic_cast<FPSCamera&>(myapp->getMainCamera())
-            .rotateCamera(xoffset, yoffset);
-    else if (leftPressing && myapp->getMainCameraMode() == CameraMode::ArcBall)
-        dynamic_cast<ArcBallCamera&>(myapp->getMainCamera())
-            .orbitCamera(xoffset, yoffset);
+    switch (myapp->getMainCameraMode()) {
+        case CameraMode::FPS: {
+            auto& fpsCamera = dynamic_cast<FPSCamera&>(myapp->getMainCamera());
+            if (rightPressing) {
+                fpsCamera.rotateCamera(xoffset, yoffset);
+            }
+            break;
+        }
+
+        case CameraMode::ArcBall: {
+            auto& arcballCamera =
+                dynamic_cast<ArcBallCamera&>(myapp->getMainCamera());
+            if (leftPressing) {
+                arcballCamera.orbitCamera(xoffset, yoffset);
+            } else if (rightPressing) {
+                arcballCamera.panCamera(xoffset * 0.1, yoffset * 0.1);
+            }
+            break;
+        }
+    }
 }
 
 static void scrollCallback(GLFWwindow* window, double xOffset, double yOffset) {
@@ -380,13 +394,34 @@ void RenderLoo::gui() {
                         .orbitCameraAroundWorldUp(rotationDPS * deltaTime);
                 }
                 ImGui::TextWrapped(
-                    "General info: \n\tPosition: (%.2f, %.2f, "
-                    "%.2f)\n\tDirection: (%.2f, %.2f, %.2f)\n\tFOV(°): %.2f",
+                    "General info: \n\tPosition: (%.1f, %.1f, "
+                    "%.1f)\n\tDirection: (%.2f, %.2f, %.2f)\n\tFOV(°): %.2f",
                     m_mainCamera->position.x, m_mainCamera->position.y,
                     m_mainCamera->position.z, m_mainCamera->getDirection().x,
                     m_mainCamera->getDirection().y,
                     m_mainCamera->getDirection().z,
                     glm::degrees(m_mainCamera->getFov()));
+                if (ImGui::Button("Screenshot")) {
+                    Framebuffer fbo;
+                    fbo.init();
+                    Texture2D tex;
+                    tex.init();
+                    tex.setupStorage(getWidth(), getHeight(), GL_RGB8, 1);
+                    fbo.attachTexture(tex, GL_COLOR_ATTACHMENT0, 0);
+                    glBlitNamedFramebuffer(0, fbo.getId(), 0, 0, getWidth(),
+                                           getHeight(), 0, 0, getWidth(),
+                                           getHeight(), GL_COLOR_BUFFER_BIT,
+                                           GL_LINEAR);
+                    // encode datetime
+                    time_t now = time(0);
+                    tm* ltm = localtime(&now);
+                    char buffer[80];
+                    strftime(buffer, 80, "%Y-%m-%d_%H-%M", ltm);
+                    string filename = string(buffer) + ".png";
+                    fs::path path = fs::current_path() / filename;
+                    tex.save(path.string());
+                    LOG(INFO) << "Screenshot saved to " << path.string();
+                }
             }
             // Model
             if (ImGui::CollapsingHeader("Model",

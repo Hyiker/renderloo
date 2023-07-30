@@ -57,9 +57,9 @@ void main() {
     vec3 baseColor = baseColor4.rgb * material.baseColor.rgb;
     vec3 emissive = texture(emissiveTex, texCoord).rgb * material.emissive.rgb;
     float metallic =
-        texture(metallicTex, texCoord).r * material.metallicRoughness.r;
+        texture(metallicTex, texCoord).b * material.metallicRoughness.r;
     float roughness =
-        texture(roughnessTex, texCoord).r * material.metallicRoughness.g;
+        texture(roughnessTex, texCoord).g * material.metallicRoughness.g;
     float alpha = baseColor4.a * material.baseColor.a;
     if (alpha == 0.0)
         discard;

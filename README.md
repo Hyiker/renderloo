@@ -1,6 +1,6 @@
 # RenderLoo
 
-This is my OpenGL rendering lab based on [loo](https://github.com/Hyiker/loo), where I can test my ideas.
+This is my OpenGL realtime rendering lab based on [loo](https://github.com/Hyiker/loo), in which I can test my ideas.
 
 ## Features
 
@@ -10,6 +10,7 @@ This is my OpenGL rendering lab based on [loo](https://github.com/Hyiker/loo), w
 - [x] Physically based rendering
   - [x] Metallic-roughness workflow
   - [x] IBL
+  - [x] Depth-dependent transparency(sorting)
 - [x] Camera
   - [x] Perspective
     - [x] Arcball
@@ -20,3 +21,7 @@ This is my OpenGL rendering lab based on [loo](https://github.com/Hyiker/loo), w
   - [x] Main light PCF
 
 ## Gallery
+
+![skull](assets/skull.png)
+
+![gun](assets/gun.png)
