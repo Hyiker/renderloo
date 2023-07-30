@@ -219,6 +219,11 @@ void RenderLoo::initGBuffers() {
                                      mipmapLevel);
     m_gbuffers.bufferC->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
 
+    m_gbuffers.bufferD = make_unique<Texture2D>();
+    m_gbuffers.bufferD->init();
+    m_gbuffers.bufferD->setupStorage(getWidth(), getHeight(), GL_RGBA32F, 1);
+    m_gbuffers.bufferD->setSizeFilter(GL_LINEAR, GL_LINEAR);
+
     panicPossibleGLError();
 
     m_gbuffers.depthStencilRb.init(GL_DEPTH24_STENCIL8, getWidth(),
@@ -228,6 +233,7 @@ void RenderLoo::initGBuffers() {
     m_gbufferfb.attachTexture(*m_gbuffers.bufferA, GL_COLOR_ATTACHMENT1, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.bufferB, GL_COLOR_ATTACHMENT2, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.bufferC, GL_COLOR_ATTACHMENT3, 0);
+    m_gbufferfb.attachTexture(*m_gbuffers.bufferD, GL_COLOR_ATTACHMENT4, 0);
     m_gbufferfb.attachRenderbuffer(m_gbuffers.depthStencilRb,
                                    GL_DEPTH_ATTACHMENT);
 }
@@ -287,6 +293,7 @@ static void popupFileSelector(
 }
 
 void RenderLoo::gui() {
+    beginEvent("GUI");
     auto& io = ImGui::GetIO();
     float h = io.DisplaySize.y;
     ImGuiWindowFlags windowFlags =
@@ -456,6 +463,7 @@ void RenderLoo::gui() {
             }
         }
     }
+    endEvent();
 }
 
 void RenderLoo::finalScreenPass(const loo::Texture2D& texture) {
@@ -487,19 +495,19 @@ void RenderLoo::convertMaterial() {
 }
 
 void RenderLoo::skyboxPass() {
+    Application::beginEvent("Skybox Pass");
     m_deferredfb.enableAttachments({GL_COLOR_ATTACHMENT0});
     glEnable(GL_DEPTH_TEST);
 
     glDepthFunc(GL_GEQUAL);
     glDisable(GL_CULL_FACE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    glm::mat4 view;
-    m_mainCamera->getViewMatrix(view);
     m_skybox.draw();
     glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
 
     m_deferredfb.unbind();
+    Application::endEvent();
 }
 void RenderLoo::gbufferPass() {
     beginEvent("GBuffer Pass");
@@ -507,7 +515,8 @@ void RenderLoo::gbufferPass() {
     m_gbufferfb.bind();
 
     m_gbufferfb.enableAttachments({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
-                                   GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3});
+                                   GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3,
+                                   GL_COLOR_ATTACHMENT4});
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_GREATER);
@@ -579,14 +588,15 @@ void RenderLoo::deferredPass() {
     m_deferredshader.setTexture(1, *m_gbuffers.bufferA);
     m_deferredshader.setTexture(2, *m_gbuffers.bufferB);
     m_deferredshader.setTexture(3, *m_gbuffers.bufferC);
-    m_deferredshader.setTexture(4, *m_mainlightshadowmap);
-    m_deferredshader.setTexture(5, m_skybox.getDiffuseConv());
-    m_deferredshader.setTexture(6, m_skybox.getSpecularConv());
-    m_deferredshader.setTexture(7, m_skybox.getBRDFLUT());
+    m_deferredshader.setTexture(4, *m_gbuffers.bufferD);
+    m_deferredshader.setTexture(5, *m_mainlightshadowmap);
+    m_deferredshader.setTexture(6, m_skybox.getDiffuseConv());
+    m_deferredshader.setTexture(7, m_skybox.getSpecularConv());
+    m_deferredshader.setTexture(8, m_skybox.getBRDFLUT());
     const loo::Texture2D& aoTex = m_aomethod == AOMethod::SSAO
                                       ? m_ssao.getAOTexture()
                                       : Texture2D::getWhiteTexture();
-    m_deferredshader.setTexture(8, aoTex);
+    m_deferredshader.setTexture(9, aoTex);
     m_deferredshader.setUniform("mainLightMatrix",
                                 m_lights[0].getLightSpaceMatrix());
 

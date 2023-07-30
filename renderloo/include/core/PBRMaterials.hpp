@@ -16,11 +16,16 @@ struct ShaderPBRMetallicMaterial {
     // std140 pad vec3 to 4N(N = 4B)
     // using vec4 to save your day
     glm::vec4 baseColor;
-    // roughness(1) + padding(3)
+    // roughness(1) + roughness(1) + padding(2)
     glm::vec4 metallicRoughness;
+    // emissive(3) + padding(1)
+    glm::vec4 emissive;
+
     ShaderPBRMetallicMaterial(glm::vec4 baseColor, float metallic,
-                              float roughness)
-        : baseColor(baseColor), metallicRoughness(metallic, roughness, 0, 0) {}
+                              float roughness, glm::vec3 emissive)
+        : baseColor(baseColor),
+          metallicRoughness(metallic, roughness, 0, 0),
+          emissive(emissive, 0) {}
 };
 class PBRMetallicMaterial : public loo::Material {
     ShaderPBRMetallicMaterial m_shadermaterial;
@@ -33,8 +38,9 @@ class PBRMetallicMaterial : public loo::Material {
         return m_shadermaterial;
     }
     PBRMetallicMaterial(glm::vec4 baseColor, float metallic, float roughness,
-                        unsigned int flags)
-        : m_shadermaterial(baseColor, metallic, roughness), m_flags(flags) {}
+                        glm::vec3 emissive, unsigned int flags)
+        : m_shadermaterial(baseColor, metallic, roughness, emissive),
+          m_flags(flags) {}
     static void init();
     [[nodiscard]] bool needAlphaBlend() const override {
         return m_flags & loo::LOO_MATERIAL_FLAG_ALPHA_BLEND;
@@ -48,6 +54,7 @@ class PBRMetallicMaterial : public loo::Material {
     std::shared_ptr<loo::Texture2D> metallicTex{};
     std::shared_ptr<loo::Texture2D> roughnessTex{};
     std::shared_ptr<loo::Texture2D> normalTex{};
+    std::shared_ptr<loo::Texture2D> emissiveTex{};
 };
 std::shared_ptr<PBRMetallicMaterial> convertPBRMetallicMaterialFromBaseMaterial(
     const loo::BaseMaterial& baseMaterial);

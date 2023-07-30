@@ -11,11 +11,13 @@ layout(binding = 1) uniform sampler2D GBufferA;
 layout(binding = 2) uniform sampler2D GBufferB;
 // normal(3) + roughness(1)
 layout(binding = 3) uniform sampler2D GBufferC;
-layout(binding = 4) uniform sampler2D MainLightShadowMap;
-layout(binding = 5) uniform samplerCube DiffuseConvolved;
-layout(binding = 6) uniform samplerCube SpecularConvolved;
-layout(binding = 7) uniform sampler2D BRDFLUT;
-layout(binding = 8) uniform sampler2D AmbientOcclusion;
+// emissive(3) + unused(1)
+layout(binding = 4) uniform sampler2D GBufferD;
+layout(binding = 5) uniform sampler2D MainLightShadowMap;
+layout(binding = 6) uniform samplerCube DiffuseConvolved;
+layout(binding = 7) uniform samplerCube SpecularConvolved;
+layout(binding = 8) uniform sampler2D BRDFLUT;
+layout(binding = 9) uniform sampler2D AmbientOcclusion;
 
 uniform mat4 mainLightMatrix;
 uniform vec3 cameraPosition;
@@ -35,6 +37,7 @@ void main() {
     float metallic;
     float occlusion;
     float roughness;
+    vec3 emissive;
     positionWS = texture(GBufferPosition, texCoord).xyz;
     normalWS = texture(GBufferC, texCoord).xyz;
     baseColor = texture(GBufferA, texCoord).rgb;
@@ -42,6 +45,7 @@ void main() {
     roughness = texture(GBufferC, texCoord).a;
     occlusion =
         texture(GBufferB, texCoord).a * texture(AmbientOcclusion, texCoord).r;
+    emissive = texture(GBufferD, texCoord).rgb;
     if (length(normalWS) < 1e-5) {
         return;
     }
@@ -80,6 +84,7 @@ void main() {
         computePBRMetallicRoughnessIBLDiffuse(surface, DiffuseConvolved, V);
     envSpecular = computePBRMetallicRoughnessIBLSpecular(
         surface, SpecularConvolved, BRDFLUT, V);
-    vec3 color = (envDiffuse + envSpecular) * occlusion + diffuse + specular;
+    vec3 color =
+        (envDiffuse + envSpecular) * occlusion + diffuse + specular + emissive;
     FragResult = vec4(color, 1.0);
 }

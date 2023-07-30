@@ -17,6 +17,8 @@ layout(location = 1) out vec4 GBufferA;
 layout(location = 2) out vec4 GBufferB;
 // normal(3) + roughness(1)
 layout(location = 3) out vec4 GBufferC;
+// emissive(3) + padding(1)
+layout(location = 4) out vec4 GBufferD;
 
 uniform vec3 uCameraPosition;
 uniform bool enableNormal;
@@ -24,26 +26,31 @@ uniform bool enableParallax;
 #ifdef MATERIAL_PBR
 layout(std140, binding = 3) uniform PBRMetallicMaterial {
     vec4 baseColor;
-    // roughness(1) + padding(3)
+    // metallic(1) + roughness(1)
     vec4 metallicRoughness;
+    // emissive(3) + padding(1)
+    vec4 emissive;
 }
 material;
 layout(binding = 10) uniform sampler2D baseColorTex;
 layout(binding = 11) uniform sampler2D occlusionTex;
 layout(binding = 12) uniform sampler2D metallicTex;
 layout(binding = 13) uniform sampler2D roughnessTex;
+layout(binding = 14) uniform sampler2D emissiveTex;
 
 void GBufferFromPBRMaterial(in vec2 texCoord, in sampler2D baseColorTex,
                             in sampler2D occlusionTex, in sampler2D metallicTex,
-                            in sampler2D roughnessTex, in vec3 baseColor,
-                            in float metallic, in float roughness,
+                            in sampler2D roughnessTex, in sampler2D emissiveTex,
+                            in vec3 baseColor, in float metallic,
+                            in float roughness, in vec3 emissive,
                             inout vec4 gbufferA, inout vec4 gbufferB,
-                            inout vec4 gbufferC) {
+                            inout vec4 gbufferC, inout vec4 gbufferD) {
     gbufferA.rgb = texture(baseColorTex, texCoord).rgb * baseColor;
     gbufferB.r = texture(metallicTex, texCoord).b * metallic;
-    gbufferB.gb = texCoord;
+    // gbufferB.gb = texCoord;
     gbufferB.a = texture(occlusionTex, texCoord).r;
     gbufferC.a = texture(roughnessTex, texCoord).g * roughness;
+    gbufferD.rgb = texture(emissiveTex, texCoord).rgb * emissive;
 }
 #else
 layout(std140, binding = 2) uniform SimpleMaterial {
@@ -96,10 +103,11 @@ void main() {
     FragPosition = vec4(vPos, 1);
     GBufferC.rgb = sNormal;
 #ifdef MATERIAL_PBR
-    GBufferFromPBRMaterial(
-        texCoord, baseColorTex, occlusionTex, metallicTex, roughnessTex,
-        material.baseColor.rgb, material.metallicRoughness.r,
-        material.metallicRoughness.g, GBufferA, GBufferB, GBufferC);
+    GBufferFromPBRMaterial(texCoord, baseColorTex, occlusionTex, metallicTex,
+                           roughnessTex, emissiveTex, material.baseColor.rgb,
+                           material.metallicRoughness.r,
+                           material.metallicRoughness.g, material.emissive.rgb,
+                           GBufferA, GBufferB, GBufferC, GBufferD);
 #else
     GBufferFromSimpleMaterial(texCoord, diffuseTex, specularTex,
                               material.diffuse.rgb, material.specular.rgb,

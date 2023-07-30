@@ -31,6 +31,8 @@ void PBRMetallicMaterial::bind(const ShaderProgram& sp) {
                   roughnessTex ? *roughnessTex : Texture2D::getWhiteTexture());
     sp.setTexture(SHADER_BINDING_PORT_MR_OCCLUSION,
                   occlusionTex ? *occlusionTex : Texture2D::getWhiteTexture());
+    sp.setTexture(SHADER_BINDING_PORT_MR_EMISSIVE,
+                  emissiveTex ? *emissiveTex : Texture2D::getBlackTexture());
 }
 void PBRMetallicMaterial::init() {
     ShaderProgram::initUniformBlock(make_unique<UniformBuffer>(
@@ -44,12 +46,13 @@ std::shared_ptr<PBRMetallicMaterial> convertPBRMetallicMaterialFromBaseMaterial(
     const auto& pbrMetallic = baseMaterial.mrWorkFlow;
     auto metallicMaterial = std::make_shared<PBRMetallicMaterial>(
         pbrMetallic.baseColor, pbrMetallic.metallic, pbrMetallic.roughness,
-        baseMaterial.flags);
+        baseMaterial.emissiveFactor, baseMaterial.flags);
     metallicMaterial->baseColorTex = pbrMetallic.baseColorTex;
     metallicMaterial->normalTex = baseMaterial.normalTex;
     metallicMaterial->metallicTex = pbrMetallic.metallicTex;
     metallicMaterial->roughnessTex = pbrMetallic.roughnessTex;
     metallicMaterial->occlusionTex = pbrMetallic.occlusionTex;
+    metallicMaterial->emissiveTex = baseMaterial.emissiveTex;
 
     return metallicMaterial;
 }

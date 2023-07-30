@@ -90,6 +90,8 @@ class RenderLoo : public loo::Application {
         std::unique_ptr<loo::Texture2D> bufferB;
         // normal(3) + roughness(1)
         std::unique_ptr<loo::Texture2D> bufferC;
+        // emissive(3) + unused(1)
+        std::unique_ptr<loo::Texture2D> bufferD;
         loo::Renderbuffer depthStencilRb;
     } m_gbuffers;
     loo::Framebuffer m_gbufferfb;

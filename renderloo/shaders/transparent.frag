@@ -17,12 +17,15 @@ layout(std140, binding = 3) uniform PBRMetallicMaterial {
     vec4 baseColor;
     // roughness(1) + padding(3)
     vec4 metallicRoughness;
+    // emissive(3) + padding(1)
+    vec4 emissive;
 }
 material;
 layout(binding = 10) uniform sampler2D baseColorTex;
 layout(binding = 11) uniform sampler2D occlusionTex;
 layout(binding = 12) uniform sampler2D metallicTex;
 layout(binding = 13) uniform sampler2D roughnessTex;
+layout(binding = 14) uniform sampler2D emissiveTex;
 
 layout(binding = 7) uniform sampler2D normalTex;
 
@@ -52,6 +55,7 @@ void main() {
     sNormal = normalize(sNormal);
     vec4 baseColor4 = texture(baseColorTex, texCoord).rgba;
     vec3 baseColor = baseColor4.rgb * material.baseColor.rgb;
+    vec3 emissive = texture(emissiveTex, texCoord).rgb * material.emissive.rgb;
     float metallic =
         texture(metallicTex, texCoord).r * material.metallicRoughness.r;
     float roughness =
@@ -94,5 +98,6 @@ void main() {
         computePBRMetallicRoughnessIBLDiffuse(surface, DiffuseConvolved, V);
     envSpecular = computePBRMetallicRoughnessIBLSpecular(
         surface, SpecularConvolved, BRDFLUT, V);
-    FragResult = vec4(diffuse + envDiffuse + specular + envSpecular, alpha);
+    FragResult =
+        vec4(diffuse + envDiffuse + specular + envSpecular + emissive, alpha);
 }
