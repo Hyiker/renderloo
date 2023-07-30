@@ -36,6 +36,8 @@ layout(binding = 23) uniform sampler2D MainLightShadowMap;
 
 uniform vec3 cameraPosition;
 uniform mat4 mainLightMatrix;
+uniform int alphaTest;
+uniform float alphaTestThreshold;
 
 layout(std140, binding = 1) uniform LightBlock {
     ShaderLight lights[12];
@@ -61,7 +63,7 @@ void main() {
     float roughness =
         texture(roughnessTex, texCoord).g * material.metallicRoughness.g;
     float alpha = baseColor4.a * material.baseColor.a;
-    if (alpha == 0.0)
+    if (alphaTest == 1 && alpha < alphaTestThreshold)
         discard;
 
     vec3 V = normalize(cameraPosition - vPos);

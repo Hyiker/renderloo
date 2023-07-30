@@ -17,6 +17,8 @@ class TransparentPass {
    private:
     loo::Framebuffer m_transparentfb;
     loo::ShaderProgram m_transparentShader;
+
+    float m_alphaTestThreshold{0.65f};
 };
 
 #endif /* RENDERLOO_INCLUDE_PASSES_TRANSPARENT_PASS_HPP */
