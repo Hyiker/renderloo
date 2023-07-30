@@ -47,10 +47,11 @@ void main() {
     if (influenceCount == 0) {
         boneMatrix = mat4(1.0);
     }
-    vec3 normalModel = normalize((boneMatrix * vec4(aNormal, 0.0)).xyz);
-    vNormal = normalize(mat3(normalMatrix) * model3 * normalModel);
+    vec4 normalWS = vec4(aNormal, 0.0);
+    normalWS = boneMatrix * normalWS;
+    vNormal = normalize((normalMatrix * normalWS).xyz);
     vPos = (model * boneMatrix * vec4(aPos, 1.0)).xyz;
-    vTangent = normalize((boneMatrix * vec4(aTangent, 0.0)).xyz);
-    vBitangent = normalize((boneMatrix * vec4(aBitangent, 0.0)).xyz);
+    vTangent = normalize((model * boneMatrix * vec4(aTangent, 0.0)).xyz);
+    vBitangent = normalize((model * boneMatrix * vec4(aBitangent, 0.0)).xyz);
     gl_Position = projection * view * vec4(vPos, 1.0);
 }

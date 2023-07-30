@@ -1,6 +1,7 @@
 #version 460 core
 #extension GL_GOOGLE_include_directive : enable
 
+#define REVERSE_Z
 #include "include/lighting.glsl"
 
 layout(binding = 0) uniform sampler2D GBufferPosition;

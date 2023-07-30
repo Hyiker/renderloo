@@ -25,7 +25,7 @@ struct ShaderLight {
     void setColor(const glm::vec3& c) { color = glm::vec4(c, 1); }
     void setType(LightType t) { type = static_cast<int>(t); }
     LightType getType() const { return static_cast<LightType>(type); }
-    glm::mat4 getLightSpaceMatrix() const;
+    glm::mat4 getLightSpaceMatrix(bool reverseZ01 = false) const;
 };
 
 struct ShaderLightBlock {

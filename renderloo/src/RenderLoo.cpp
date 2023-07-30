@@ -346,9 +346,8 @@ void RenderLoo::gui() {
                     ImGui::ColorEdit3("Color", (float*)&m_lights[0].color);
                     ImGui::SliderFloat3("Direction",
                                         (float*)&m_lights[0].direction, -1, 1);
-                    ImGui::SliderFloat("Intensity",
-                                       (float*)&m_lights[0].intensity, 0.0,
-                                       100.0);
+                    ImGui::SliderFloat(
+                        "Intensity", (float*)&m_lights[0].intensity, 0.0, 3.0);
                 }
             // Camera
             if (ImGui::CollapsingHeader("Camera",
@@ -539,13 +538,15 @@ void RenderLoo::shadowMapPass() {
     glGetIntegerv(GL_VIEWPORT, vp);
     glViewport(0, 0, SHADOWMAP_RESOLUION[0], SHADOWMAP_RESOLUION[1]);
     glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_GREATER);
+    glClearDepth(0.0f);
     glClear(GL_DEPTH_BUFFER_BIT);
 
     m_shadowmapshader.use();
     // directional light matrix
     const auto& mainLight = m_lights[0];
     CHECK_EQ(mainLight.type, static_cast<int>(LightType::DIRECTIONAL));
-    glm::mat4 lightSpaceMatrix = mainLight.getLightSpaceMatrix();
+    glm::mat4 lightSpaceMatrix = mainLight.getLightSpaceMatrix(true);
 
     m_shadowmapshader.setUniform("lightSpaceMatrix", lightSpaceMatrix);
 
@@ -558,6 +559,9 @@ void RenderLoo::shadowMapPass() {
     m_mainlightshadowmapfb.unbind();
     glViewport(vp[0], vp[1], vp[2], vp[3]);
     endEvent();
+
+    glDepthFunc(GL_LESS);
+    glClearDepth(1.0f);
 }
 
 void RenderLoo::deferredPass() {

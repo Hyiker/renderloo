@@ -37,13 +37,13 @@ void GBufferFromPBRMaterial(in vec2 texCoord, in sampler2D baseColorTex,
                             in sampler2D occlusionTex, in sampler2D metallicTex,
                             in sampler2D roughnessTex, in vec3 baseColor,
                             in float metallic, in float roughness,
-                            inout vec4 GBufferA, inout vec4 GBufferB,
-                            inout vec4 GBufferC) {
-    GBufferA.rgb = texture(baseColorTex, texCoord).rgb * baseColor;
-    GBufferB.r = texture(metallicTex, texCoord).b * metallic;
-    GBufferB.gb = texCoord;
-    GBufferB.a = texture(occlusionTex, texCoord).r;
-    GBufferC.a = texture(roughnessTex, texCoord).g * roughness;
+                            inout vec4 gbufferA, inout vec4 gbufferB,
+                            inout vec4 gbufferC) {
+    gbufferA.rgb = texture(baseColorTex, texCoord).rgb * baseColor;
+    gbufferB.r = texture(metallicTex, texCoord).b * metallic;
+    gbufferB.gb = texCoord;
+    gbufferB.a = texture(occlusionTex, texCoord).r;
+    gbufferC.a = texture(roughnessTex, texCoord).g * roughness;
 }
 #else
 layout(std140, binding = 2) uniform SimpleMaterial {

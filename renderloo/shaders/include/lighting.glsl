@@ -239,7 +239,11 @@ float computeShadow(in mat4 lightMatrix, in sampler2D shadowMap,
         for (int j = -PCF_KERNEL_SIZE / 2; j <= PCF_KERNEL_SIZE / 2; j++) {
             float shadowMapDepth =
                 texture(shadowMap, positionNDC.xy + vec2(i, j) * texelSize).r;
+#ifndef REVERSE_Z
             shadow += positionNDC.z - bias > shadowMapDepth ? 1.0 : 0.0;
+#else
+            shadow += positionNDC.z + bias < shadowMapDepth ? 1.0 : 0.0;
+#endif
         }
     }
     return shadow / float(PCF_KERNEL_SIZE * PCF_KERNEL_SIZE);
