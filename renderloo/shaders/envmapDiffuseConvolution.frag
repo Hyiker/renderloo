@@ -6,7 +6,7 @@ layout(location = 0) in vec3 localPos;
 layout(location = 0) out vec3 FragColor;
 
 layout(binding = 0, location = 3) uniform samplerCube envMap;
-const uint N_SAMPLES = 4096;
+const uint N_SAMPLES = 2048;
 #define PI_INV 0.31830988618379067154
 void main() {
     vec3 N = normalize(localPos);
@@ -17,12 +17,14 @@ void main() {
     T = normalize(cross(T, N));
     vec3 B = normalize(cross(N, T));
     mat3 TBN = mat3(T, B, N);
-    vec3 irradiance = vec3(0.0);
+    dvec3 irradiance = vec3(0.0);
     for (int i = 0; i < N_SAMPLES; i++) {
         float pdf = 0.0;
         vec3 dirLocal = SampleHemisphereCosineWeighted(i, N_SAMPLES, pdf);
         vec3 dirWorld = TBN * dirLocal;
+        dvec3 L = textureLod(envMap, dirWorld, 0.0).rgb;
+        // clamp to avoid NaNs
         irradiance += textureLod(envMap, dirWorld, 0.0).rgb;
     }
-    FragColor = irradiance / float(N_SAMPLES);
+    FragColor = vec3(irradiance / double(N_SAMPLES));
 }

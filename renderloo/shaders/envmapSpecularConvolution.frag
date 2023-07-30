@@ -22,8 +22,8 @@ void main() {
     T = normalize(cross(T, N));
     vec3 B = normalize(cross(N, T));
     mat3 TBN = mat3(T, B, N);
-    vec3 irradiance = vec3(0.0);
-    float weightSum = 0.0;
+    dvec3 irradiance = vec3(0.0);
+    double weightSum = 0.0;
     float envMapSize = textureSize(envMap, 0).x;
     float solidAngleTexel = 4.0 * PI / (6.0 * envMapSize * envMapSize);
     for (int i = 0; i < N_SAMPLES; i++) {
@@ -45,5 +45,5 @@ void main() {
     }
     if (weightSum > 0.0)
         irradiance /= weightSum;
-    FragColor = irradiance;
+    FragColor = vec3(irradiance);
 }
