@@ -128,6 +128,11 @@ void RenderLoo::loadModel(const std::string& filename) {
     glm::vec3 diagonal = sceneAABB.getDiagonal();
     LOG(INFO) << "diagnal: " << glm::to_string(diagonal) << endl;
     LOG(INFO) << "diagnal length: " << glm::length(diagonal) << endl;
+    // scale the model to approximately 10x10x10
+    float scale = 17.0f / glm::length(diagonal);
+    m_scene.scale(glm::vec3(scale));
+    LOG(INFO) << "scaled the model by: " << scale << endl;
+    sceneAABB = m_scene.computeAABBWorldSpace();
     m_mainCamera = placeCameraBySceneAABB(sceneAABB, m_cameraMode);
     LOG(INFO) << "Load done" << endl;
 }
