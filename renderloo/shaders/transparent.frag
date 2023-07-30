@@ -55,6 +55,8 @@ void main() {
     float roughness =
         texture(roughnessTex, texCoord).r * material.metallicRoughness.g;
     float alpha = baseColor4.a * material.baseColor.a;
+    if (alpha == 0.0)
+        discard;
 
     vec3 V = normalize(cameraPosition - vPos);
     SurfaceParamsPBRMetallicRoughness surface;

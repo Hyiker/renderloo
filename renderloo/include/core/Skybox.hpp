@@ -11,6 +11,7 @@ class Skybox {
    public:
     Skybox();
     void loadTexture(const std::string& path);
+    void loadPureColor(const glm::vec3& value);
     void draw() const;
     const loo::TextureCubeMap& getEnvmap() const {
         return m_envmap ? *m_envmap : loo::TextureCubeMap::getBlackTexture();
@@ -35,6 +36,7 @@ class Skybox {
         loo::Framebuffer framebuffer;
         loo::Renderbuffer renderbuffer;
     } helper;
+    void computePrefilteredEnvmap();
     void renderEquirectangularToCubemap(const loo::Texture2D& equiTexture);
     void convolveDiffuseEnvmap();
     void convolveSpecularEnvmap();

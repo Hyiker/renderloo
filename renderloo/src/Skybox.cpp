@@ -234,31 +234,48 @@ void Skybox::loadTexture(const std::string& path) {
         m_envmap->setupStorage(ENVMAP_SIZE, ENVMAP_SIZE, GL_RGB16F, -1);
         m_envmap->setWrapFilter(GL_CLAMP_TO_EDGE);
         m_envmap->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
-        if (!m_diffuseConv) {
-            m_diffuseConv = make_unique<TextureCubeMap>();
-            m_diffuseConv->init();
-            m_diffuseConv->setupStorage(DIFFUSECONV_SIZE, DIFFUSECONV_SIZE,
-                                        GL_RGB16F, 1);
-            m_diffuseConv->setWrapFilter(GL_CLAMP_TO_EDGE);
-            m_diffuseConv->setSizeFilter(GL_LINEAR, GL_LINEAR);
-        }
-        if (!m_specularConv) {
-            m_specularConv = make_unique<TextureCubeMap>();
-            m_specularConv->init();
-            m_specularConv->setupStorage(SPECULARCONV_SIZE, SPECULARCONV_SIZE,
-                                         GL_RGB16F, SPECULARCONV_MIPLEVEL);
-            m_specularConv->setWrapFilter(GL_CLAMP_TO_EDGE);
-            m_specularConv->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
-        }
+
         LOG(INFO) << "Converting equirectangular map to cubemap" << endl;
         renderEquirectangularToCubemap(*equiMap);
         m_envmap->generateMipmap();
-        LOG(INFO) << "Convolving diffuse envmap" << endl;
-        convolveDiffuseEnvmap();
-        LOG(INFO) << "Convolving specular envmap" << endl;
-        convolveSpecularEnvmap();
     }
+    computePrefilteredEnvmap();
     this->path = path;
+}
+void Skybox::loadPureColor(const glm::vec3& value) {
+    m_envmap = make_unique<TextureCubeMap>();
+    m_envmap->init();
+    m_envmap->setupStorage(1, 1, GL_RGB32F, -1);
+    float data[3] = {value.r, value.g, value.b};
+    for (int i = 0; i < 6; ++i) {
+        m_envmap->setupFace(i, data, GL_RGB, GL_FLOAT);
+    }
+    m_envmap->setWrapFilter(GL_CLAMP_TO_EDGE);
+    m_envmap->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+    computePrefilteredEnvmap();
+    path = "";
+}
+void Skybox::computePrefilteredEnvmap() {
+    if (!m_diffuseConv) {
+        m_diffuseConv = make_unique<TextureCubeMap>();
+        m_diffuseConv->init();
+        m_diffuseConv->setupStorage(DIFFUSECONV_SIZE, DIFFUSECONV_SIZE,
+                                    GL_RGB16F, 1);
+        m_diffuseConv->setWrapFilter(GL_CLAMP_TO_EDGE);
+        m_diffuseConv->setSizeFilter(GL_LINEAR, GL_LINEAR);
+    }
+    if (!m_specularConv) {
+        m_specularConv = make_unique<TextureCubeMap>();
+        m_specularConv->init();
+        m_specularConv->setupStorage(SPECULARCONV_SIZE, SPECULARCONV_SIZE,
+                                     GL_RGB16F, SPECULARCONV_MIPLEVEL);
+        m_specularConv->setWrapFilter(GL_CLAMP_TO_EDGE);
+        m_specularConv->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
+    }
+    LOG(INFO) << "Convolving diffuse envmap" << endl;
+    convolveDiffuseEnvmap();
+    LOG(INFO) << "Convolving specular envmap" << endl;
+    convolveSpecularEnvmap();
 }
 
 void Skybox::draw() const {

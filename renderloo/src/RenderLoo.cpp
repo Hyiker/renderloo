@@ -336,7 +336,7 @@ void RenderLoo::gui() {
 
     {
         ImGui::SetNextWindowBgAlpha(0.5f);
-        ImGui::SetNextWindowSize(ImVec2(300, h * 0.5));
+        ImGui::SetNextWindowSize(ImVec2(300, h * 0.7));
         ImGui::SetNextWindowPos(ImVec2(0, h * 0.3), ImGuiCond_Always);
         if (ImGui::Begin("Options", nullptr, windowFlags)) {
             // Sun
@@ -382,6 +382,16 @@ void RenderLoo::gui() {
                     m_mainCamera->getDirection().z,
                     glm::degrees(m_mainCamera->getFov()));
             }
+            // Model
+            if (ImGui::CollapsingHeader("Model",
+                                        ImGuiTreeNodeFlags_DefaultOpen)) {
+                static float modelRotation = 0.0f;
+                if (ImGui::SliderFloat("Rotation(°)", &modelRotation, 0, 360)) {
+                    float rotationRad = glm::radians(modelRotation);
+                    m_scene.rotation =
+                        glm::angleAxis(rotationRad, glm::vec3(0, 1, 0));
+                }
+            }
             // OpenGL option
             if (ImGui::CollapsingHeader("Render options",
                                         ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -419,6 +429,13 @@ void RenderLoo::gui() {
                                           });
                         resumeTime();
                     }
+                    static glm::vec3 skyboxColor = glm::vec3(1.f);
+                    ImGui::ColorEdit3("", (float*)&skyboxColor,
+                                      ImGuiColorEditFlags_HDR);
+                    ImGui::SameLine();
+                    if (ImGui::Button("Apply")) {
+                        m_skybox.loadPureColor(skyboxColor);
+                    }
                 }
                 {
                     ImGui::PushItemWidth(150);
@@ -437,22 +454,6 @@ void RenderLoo::gui() {
                         resumeTime();
                     }
                 }
-            }
-        }
-    }
-    {
-        float h_img = h * 0.2,
-              w_img = h_img / io.DisplaySize.y * io.DisplaySize.x;
-        ImGui::SetNextWindowBgAlpha(1.0f);
-        vector<GLuint> textures{};
-        ImGui::SetNextWindowSize(ImVec2(w_img * textures.size() + 40, h_img));
-        ImGui::SetNextWindowPos(ImVec2(0, h * 0.8), ImGuiCond_Always);
-        if (ImGui::Begin("Textures", nullptr,
-                         windowFlags | ImGuiWindowFlags_NoDecoration)) {
-            for (auto texId : textures) {
-                ImGui::Image((void*)(intptr_t)texId, ImVec2(w_img, h_img),
-                             ImVec2(0, 1), ImVec2(1, 0));
-                ImGui::SameLine();
             }
         }
     }
@@ -632,25 +633,15 @@ void RenderLoo::clear() {
 }
 void RenderLoo::keyboard() {
     if (keyForward())
-        m_mainCamera->moveCamera(CameraMovement::FORWARD,
-                                 getFrameTimeFromStart());
+        m_mainCamera->moveCamera(CameraMovement::FORWARD, getDeltaTime());
     if (keyBackward())
-        m_mainCamera->moveCamera(CameraMovement::BACKWARD,
-                                 getFrameTimeFromStart());
+        m_mainCamera->moveCamera(CameraMovement::BACKWARD, getDeltaTime());
     if (keyLeft())
-        m_mainCamera->moveCamera(CameraMovement::LEFT, getFrameTimeFromStart());
+        m_mainCamera->moveCamera(CameraMovement::LEFT, getDeltaTime());
     if (keyRight())
-        m_mainCamera->moveCamera(CameraMovement::RIGHT,
-                                 getFrameTimeFromStart());
+        m_mainCamera->moveCamera(CameraMovement::RIGHT, getDeltaTime());
     if (glfwGetKey(getWindow(), GLFW_KEY_R)) {
         m_mainCamera = placeCameraBySceneAABB(m_scene.aabb, m_cameraMode);
-    }
-    static bool h_pressed = false;
-    if (glfwGetKey(getWindow(), GLFW_KEY_H) == GLFW_PRESS) {
-        h_pressed = true;
-    } else if (glfwGetKey(getWindow(), GLFW_KEY_H) == GLFW_RELEASE &&
-               h_pressed) {
-        h_pressed = false;
     }
 }
 void RenderLoo::mouse() {
