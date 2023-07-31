@@ -231,7 +231,11 @@ float computeShadow(in mat4 lightMatrix, in sampler2D shadowMap,
                     in vec3 positionWS) {
     vec4 positionLS = lightMatrix * vec4(positionWS, 1.0);
     vec3 positionNDC = positionLS.xyz / positionLS.w;
+#ifdef REVERSE_Z
+    positionNDC.xy = positionNDC.xy * 0.5 + 0.5;
+#else
     positionNDC = positionNDC * 0.5 + 0.5;
+#endif
     float shadow = 0.0;
     float bias = 0.005;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0).xy;

@@ -184,7 +184,7 @@ RenderLoo::RenderLoo(int width, int height)
         sun.setPosition(vec3(0, 10.0, 0));
         sun.setDirection(vec3(0, -1, 0));
         sun.color = vec4(1.0);
-        sun.intensity = 0.0;
+        sun.intensity = 0.8;
         sun.setType(LightType::DIRECTIONAL);
         m_lights.push_back(sun);
     }
@@ -260,7 +260,10 @@ void RenderLoo::initShadowMap() {
                                        SHADOWMAP_RESOLUION[1],
                                        GL_DEPTH_COMPONENT32, 1);
     m_mainlightshadowmap->setSizeFilter(GL_NEAREST, GL_NEAREST);
-    // m_mainlightshadowmap->setWrapFilter(GL_CLAMP_TO_EDGE);
+    m_mainlightshadowmap->setWrapFilter(GL_CLAMP_TO_BORDER);
+    float borderDepth[] = {0.0f, 0.0f, 0.0f, 0.0f};
+    glTextureParameterfv(m_mainlightshadowmap->getId(), GL_TEXTURE_BORDER_COLOR,
+                         borderDepth);
     m_mainlightshadowmapfb.attachTexture(*m_mainlightshadowmap,
                                          GL_DEPTH_ATTACHMENT, 0);
     glNamedFramebufferDrawBuffer(m_mainlightshadowmapfb.getId(), GL_NONE);
@@ -578,8 +581,7 @@ void RenderLoo::shadowMapPass() {
     beginEvent("Shadow Map Pass");
     // render shadow map here
     m_mainlightshadowmapfb.bind();
-    int vp[4];
-    glGetIntegerv(GL_VIEWPORT, vp);
+    storeViewport();
     glViewport(0, 0, SHADOWMAP_RESOLUION[0], SHADOWMAP_RESOLUION[1]);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_GREATER);
@@ -593,15 +595,24 @@ void RenderLoo::shadowMapPass() {
     glm::mat4 lightSpaceMatrix = mainLight.getLightSpaceMatrix(true);
 
     m_shadowmapshader.setUniform("lightSpaceMatrix", lightSpaceMatrix);
+    m_shadowmapshader.setUniform("alphaTestThreshold",
+                                 m_transparentPass.getAlphaTestThreshold());
 
+    // first pass: render opaque objects
     for (auto mesh : m_scene.getMeshes()) {
         if (mesh->needAlphaBlend())
             continue;
         drawMesh(*mesh, m_scene.getModelMatrix(), m_shadowmapshader);
     }
+    // second pass render transparent objects using alpha test
+    for (auto mesh : m_scene.getMeshes()) {
+        if (!mesh->needAlphaBlend())
+            continue;
+        drawMesh(*mesh, m_scene.getModelMatrix(), m_shadowmapshader);
+    }
 
     m_mainlightshadowmapfb.unbind();
-    glViewport(vp[0], vp[1], vp[2], vp[3]);
+    restoreViewport();
     endEvent();
 
     glDepthFunc(GL_LESS);
@@ -633,7 +644,7 @@ void RenderLoo::deferredPass() {
                                       : Texture2D::getWhiteTexture();
     m_deferredshader.setTexture(9, aoTex);
     m_deferredshader.setUniform("mainLightMatrix",
-                                m_lights[0].getLightSpaceMatrix());
+                                m_lights[0].getLightSpaceMatrix(true));
 
     m_deferredshader.setUniform("cameraPosition", m_mainCamera->position);
 

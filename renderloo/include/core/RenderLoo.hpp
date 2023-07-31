@@ -19,6 +19,7 @@
 #include <vector>
 #include "core/Light.hpp"
 #include "core/Skybox.hpp"
+#include "passes/ShadowMapPass.hpp"
 #include "passes/TransparentPass.hpp"
 
 #include <loo/Animation.hpp>

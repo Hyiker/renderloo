@@ -13,6 +13,9 @@ class TransparentPass {
                 const loo::Camera& camera,
                 const loo::Texture2D& mainLightShadowMap,
                 const std::vector<ShaderLight>& lights);
+    [[nodiscard]] auto getAlphaTestThreshold() const {
+        return m_alphaTestThreshold;
+    }
 
    private:
     loo::Framebuffer m_transparentfb;
