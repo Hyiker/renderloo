@@ -2,6 +2,7 @@
 #extension GL_GOOGLE_include_directive : enable
 
 #define REVERSE_Z
+#include "include/constants.glsl"
 #include "include/lighting.glsl"
 
 layout(binding = 0) uniform sampler2D GBufferPosition;
@@ -19,15 +20,18 @@ layout(binding = 7) uniform samplerCube SpecularConvolved;
 layout(binding = 8) uniform sampler2D BRDFLUT;
 layout(binding = 9) uniform sampler2D AmbientOcclusion;
 
-uniform mat4 mainLightMatrix;
 uniform vec3 cameraPosition;
 
 in vec2 texCoord;
 layout(location = 0) out vec4 FragResult;
 
 layout(std140, binding = 1) uniform LightBlock {
-    ShaderLight lights[12];
+    ShaderLight lights[SHADER_LIGHTS_MAX];
     int nLights;
+};
+
+layout(std140, binding = 4) uniform DirectionalShadowMatricesBlock {
+    mat4 _DirectionalShadowMatrices[SHADER_SHADOWED_DIRECTIONAL_LIGHTS_MAX];
 };
 void main() {
     vec3 positionWS;
@@ -70,8 +74,13 @@ void main() {
                 continue;
         }
         float intensity = light.intensity / (distance * distance);
-        float shadow =
-            computeShadow(mainLightMatrix, MainLightShadowMap, positionWS);
+        float shadow = 0.0;
+        if (light.type == LIGHT_TYPE_DIRECTIONAL) {
+            shadow = computeShadow(
+                light.shadowData,
+                _DirectionalShadowMatrices[light.shadowData.tileIndex],
+                MainLightShadowMap, positionWS);
+        }
         vec3 diff, spec;
         computePBRMetallicRoughnessLocalLighting(surface, light, V, L,
                                                  intensity, diff, spec);

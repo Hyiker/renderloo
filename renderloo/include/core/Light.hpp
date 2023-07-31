@@ -4,7 +4,14 @@
 
 #include <loo/UniformBuffer.hpp>
 enum class LightType { SPOT = 0, POINT = 1, DIRECTIONAL = 2 };
-constexpr int SHADER_LIGHTS_MAX = 12;
+constexpr int SHADER_LIGHTS_MAX = 12,
+              SHADER_SHADOWED_DIRECTIONAL_LIGHTS_MAX = 1;
+
+struct DirectionalShadowData {
+    float strength{0.f};
+    int tileIndex{0};
+    int padding[2]{0};
+};
 struct ShaderLight {
     // spot, point
     glm::vec4 position;
@@ -20,6 +27,7 @@ struct ShaderLight {
     // spot
     float spotAngle;
     int type;
+    DirectionalShadowData shadowData;
     void setPosition(const glm::vec3& p) { position = glm::vec4(p, 1); }
     void setDirection(const glm::vec3& d);
     void setColor(const glm::vec3& c) { color = glm::vec4(c, 1); }
@@ -30,7 +38,11 @@ struct ShaderLight {
 
 struct ShaderLightBlock {
     ShaderLight lights[SHADER_LIGHTS_MAX];
-    int lightCount;
+    int lightCount{0};
+};
+
+struct ShaderDirectionalShadowMatricesBlock {
+    glm::mat4 matrices[SHADER_SHADOWED_DIRECTIONAL_LIGHTS_MAX];
 };
 // TODO
 // ShaderLight createSpotLight(const glm::vec3& p, const glm::vec3& o,
@@ -41,6 +53,7 @@ struct ShaderLightBlock {
 //                              float intensity = 1.0, float range = -1.0);
 
 ShaderLight createDirectionalLight(const glm::vec3& d, const glm::vec3& c,
-                                   float intensity = 1.0);
+                                   float intensity = 1.0,
+                                   float shadowStrength = 1.0f);
 
 #endif /* LOO_INCLUDE_LOO_LIGHT_HPP */

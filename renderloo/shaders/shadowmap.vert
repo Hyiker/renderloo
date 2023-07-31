@@ -4,10 +4,13 @@
 #include "include/constants.glsl"
 
 layout(location = 0) in vec3 aPos;
+layout(location = 2) in vec2 aTexCoord;
 layout(location = 5) in ivec4 aBoneIDs;
 layout(location = 6) in vec4 aWeights;
 
-uniform mat4 lightSpaceMatrix;
+layout(location = 2) out vec2 vTexCoord;
+
+layout(location = 0) uniform mat4 lightSpaceMatrix;
 layout(std140, binding = 0) uniform MVPMatrices {
     mat4 model;
     mat4 view;

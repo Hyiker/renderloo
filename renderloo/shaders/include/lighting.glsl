@@ -1,6 +1,13 @@
-#ifndef HDSSS_SHADERS_INCLUDE_LIGHTING_HPP
-#define HDSSS_SHADERS_INCLUDE_LIGHTING_HPP
+#ifndef RENDERLOO_SHADERS_INCLUDE_LIGHTING_HPP
+#define RENDERLOO_SHADERS_INCLUDE_LIGHTING_HPP
 #include "./math.glsl"
+
+struct DirectionalShadowData {
+    float strength;
+    int tileIndex;
+    vec2 padding;
+};
+
 struct ShaderLight {
     // spot, point
     vec4 position;
@@ -15,6 +22,7 @@ struct ShaderLight {
     // spot
     float spotAngle;
     int type;
+    DirectionalShadowData shadowData;
 };
 
 struct SurfaceParamsBlinnPhong {
@@ -227,8 +235,10 @@ vec3 computeSurfaceIrradiance(in vec3 position, in vec3 normal,
 
 #define PCF_KERNEL_SIZE 5
 
-float computeShadow(in mat4 lightMatrix, in sampler2D shadowMap,
-                    in vec3 positionWS) {
+float computeShadow(in DirectionalShadowData shadowData, in mat4 lightMatrix,
+                    in sampler2D shadowMap, in vec3 positionWS) {
+    if (shadowData.strength == 0.0)
+        return 0.0;
     vec4 positionLS = lightMatrix * vec4(positionWS, 1.0);
     vec3 positionNDC = positionLS.xyz / positionLS.w;
 #ifdef REVERSE_Z
@@ -250,7 +260,8 @@ float computeShadow(in mat4 lightMatrix, in sampler2D shadowMap,
 #endif
         }
     }
-    return shadow / float(PCF_KERNEL_SIZE * PCF_KERNEL_SIZE);
+    return shadowData.strength * shadow /
+           float(PCF_KERNEL_SIZE * PCF_KERNEL_SIZE);
 }
 
-#endif /* HDSSS_SHADERS_INCLUDE_LIGHTING_HPP */
+#endif /* RENDERLOO_SHADERS_INCLUDE_LIGHTING_HPP */

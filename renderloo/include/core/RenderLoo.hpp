@@ -48,7 +48,6 @@ class RenderLoo : public loo::Application {
 
    private:
     void initGBuffers();
-    void initShadowMap();
     void initDeferredPass();
 
     void loop() override;
@@ -78,9 +77,7 @@ class RenderLoo : public loo::Application {
 
     std::vector<ShaderLight> m_lights;
 
-    std::shared_ptr<loo::Texture2D> m_mainlightshadowmap;
-    loo::Framebuffer m_mainlightshadowmapfb;
-    loo::ShaderProgram m_shadowmapshader;
+    ShadowMapPass m_shadowMapPass;
 
     // gbuffer
     struct GBuffer {

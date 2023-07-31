@@ -160,8 +160,6 @@ RenderLoo::RenderLoo(int width, int height)
                    Shader(GBUFFER_FRAG, ShaderType::Fragment)},
       m_scene(),
       m_mainCamera(),
-      m_shadowmapshader{Shader(SHADOWMAP_VERT, ShaderType::Vertex),
-                        Shader(SHADOWMAP_FRAG, ShaderType::Fragment)},
       m_ssao(getWidth(), getHeight()),
       m_deferredshader{Shader(DEFERRED_VERT, ShaderType::Vertex),
                        Shader(DEFERRED_FRAG, ShaderType::Fragment)},
@@ -171,7 +169,7 @@ RenderLoo::RenderLoo(int width, int height)
     PBRMetallicMaterial::init();
 
     initGBuffers();
-    initShadowMap();
+    m_shadowMapPass.init();
     m_ssao.init(m_gbuffers.depthStencilRb);
     initDeferredPass();
     m_transparentPass.init(m_gbuffers.depthStencilRb, *m_deferredResult);
@@ -179,18 +177,18 @@ RenderLoo::RenderLoo(int width, int height)
 
     // final pass related
     { m_finalprocess.init(); }
+    // create sun light
     if (m_lights.empty()) {
-        ShaderLight sun;
-        sun.setPosition(vec3(0, 10.0, 0));
-        sun.setDirection(vec3(0, -1, 0));
-        sun.color = vec4(1.0);
-        sun.intensity = 0.8;
-        sun.setType(LightType::DIRECTIONAL);
-        m_lights.push_back(sun);
+        m_lights.push_back(
+            createDirectionalLight(vec3(-1, -1, 0), vec3(1.0), 0.8, 1.0));
     }
     // init lights buffer
     ShaderProgram::initUniformBlock(std::make_unique<UniformBuffer>(
         SHADER_UB_PORT_LIGHTS, sizeof(ShaderLightBlock)));
+    // init directional shadow matrices buffer
+    ShaderProgram::initUniformBlock(std::make_unique<UniformBuffer>(
+        SHADER_UB_PORT_DIRECTIONAL_SHADOW_MATRICES,
+        sizeof(ShaderDirectionalShadowMatricesBlock)));
     // init mvp uniform buffer
     ShaderProgram::initUniformBlock(
         std::make_unique<UniformBuffer>(SHADER_UB_PORT_MVP, sizeof(MVP)));
@@ -250,25 +248,6 @@ void RenderLoo::initGBuffers() {
     m_gbufferfb.attachTexture(*m_gbuffers.bufferD, GL_COLOR_ATTACHMENT4, 0);
     m_gbufferfb.attachRenderbuffer(m_gbuffers.depthStencilRb,
                                    GL_DEPTH_ATTACHMENT);
-}
-
-void RenderLoo::initShadowMap() {
-    m_mainlightshadowmapfb.init();
-    m_mainlightshadowmap = make_shared<Texture2D>();
-    m_mainlightshadowmap->init();
-    m_mainlightshadowmap->setupStorage(SHADOWMAP_RESOLUION[0],
-                                       SHADOWMAP_RESOLUION[1],
-                                       GL_DEPTH_COMPONENT32, 1);
-    m_mainlightshadowmap->setSizeFilter(GL_NEAREST, GL_NEAREST);
-    m_mainlightshadowmap->setWrapFilter(GL_CLAMP_TO_BORDER);
-    float borderDepth[] = {0.0f, 0.0f, 0.0f, 0.0f};
-    glTextureParameterfv(m_mainlightshadowmap->getId(), GL_TEXTURE_BORDER_COLOR,
-                         borderDepth);
-    m_mainlightshadowmapfb.attachTexture(*m_mainlightshadowmap,
-                                         GL_DEPTH_ATTACHMENT, 0);
-    glNamedFramebufferDrawBuffer(m_mainlightshadowmapfb.getId(), GL_NONE);
-    glNamedFramebufferReadBuffer(m_mainlightshadowmapfb.getId(), GL_NONE);
-    panicPossibleGLError();
 }
 void RenderLoo::initDeferredPass() {
     m_deferredfb.init();
@@ -364,7 +343,7 @@ void RenderLoo::gui() {
         ImGui::SetNextWindowPos(ImVec2(0, h * 0.3), ImGuiCond_Always);
         if (ImGui::Begin("Options", nullptr, windowFlags)) {
             // Sun
-            if (!m_lights.empty())
+            if (!m_lights.empty()) {
                 if (ImGui::CollapsingHeader("Sun",
                                             ImGuiTreeNodeFlags_DefaultOpen)) {
                     ImGui::ColorEdit3("Color", (float*)&m_lights[0].color);
@@ -373,6 +352,18 @@ void RenderLoo::gui() {
                     ImGui::SliderFloat(
                         "Intensity", (float*)&m_lights[0].intensity, 0.0, 3.0);
                 }
+                // Shadow
+                if (ImGui::CollapsingHeader("Shadow",
+                                            ImGuiTreeNodeFlags_DefaultOpen)) {
+
+                    const char* transparentMode[] = {"Solid", "Alpha Test"};
+                    ImGui::Combo("Transparent",
+                                 (int*)(&m_shadowMapPass.transparentShadowMode),
+                                 transparentMode,
+                                 IM_ARRAYSIZE(transparentMode));
+                }
+            }
+
             // Camera
             if (ImGui::CollapsingHeader("Camera",
                                         ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -390,7 +381,7 @@ void RenderLoo::gui() {
                     }
                 }
                 if (m_cameraMode == CameraMode::ArcBall) {
-                    static float rotationDPS = 10.f;
+                    static float rotationDPS = 0.f;
                     float deltaTime = getDeltaTime();
                     ImGui::SliderFloat("Rot(°/s)", &rotationDPS, 0, 360);
                     dynamic_cast<ArcBallCamera&>(*m_mainCamera)
@@ -577,47 +568,7 @@ void RenderLoo::gbufferPass() {
     endEvent();
 }
 
-void RenderLoo::shadowMapPass() {
-    beginEvent("Shadow Map Pass");
-    // render shadow map here
-    m_mainlightshadowmapfb.bind();
-    storeViewport();
-    glViewport(0, 0, SHADOWMAP_RESOLUION[0], SHADOWMAP_RESOLUION[1]);
-    glEnable(GL_DEPTH_TEST);
-    glDepthFunc(GL_GREATER);
-    glClearDepth(0.0f);
-    glClear(GL_DEPTH_BUFFER_BIT);
-
-    m_shadowmapshader.use();
-    // directional light matrix
-    const auto& mainLight = m_lights[0];
-    CHECK_EQ(mainLight.type, static_cast<int>(LightType::DIRECTIONAL));
-    glm::mat4 lightSpaceMatrix = mainLight.getLightSpaceMatrix(true);
-
-    m_shadowmapshader.setUniform("lightSpaceMatrix", lightSpaceMatrix);
-    m_shadowmapshader.setUniform("alphaTestThreshold",
-                                 m_transparentPass.getAlphaTestThreshold());
-
-    // first pass: render opaque objects
-    for (auto mesh : m_scene.getMeshes()) {
-        if (mesh->needAlphaBlend())
-            continue;
-        drawMesh(*mesh, m_scene.getModelMatrix(), m_shadowmapshader);
-    }
-    // second pass render transparent objects using alpha test
-    for (auto mesh : m_scene.getMeshes()) {
-        if (!mesh->needAlphaBlend())
-            continue;
-        drawMesh(*mesh, m_scene.getModelMatrix(), m_shadowmapshader);
-    }
-
-    m_mainlightshadowmapfb.unbind();
-    restoreViewport();
-    endEvent();
-
-    glDepthFunc(GL_LESS);
-    glClearDepth(1.0f);
-}
+void RenderLoo::shadowMapPass() {}
 
 void RenderLoo::deferredPass() {
     beginEvent("Deferred Pass");
@@ -635,7 +586,7 @@ void RenderLoo::deferredPass() {
     m_deferredshader.setTexture(2, *m_gbuffers.bufferB);
     m_deferredshader.setTexture(3, *m_gbuffers.bufferC);
     m_deferredshader.setTexture(4, *m_gbuffers.bufferD);
-    m_deferredshader.setTexture(5, *m_mainlightshadowmap);
+    m_deferredshader.setTexture(5, m_shadowMapPass.getDirectionalShadowMap());
     m_deferredshader.setTexture(6, m_skybox.getDiffuseConv());
     m_deferredshader.setTexture(7, m_skybox.getSpecularConv());
     m_deferredshader.setTexture(8, m_skybox.getBRDFLUT());
@@ -643,8 +594,6 @@ void RenderLoo::deferredPass() {
                                       ? m_ssao.getAOTexture()
                                       : Texture2D::getWhiteTexture();
     m_deferredshader.setTexture(9, aoTex);
-    m_deferredshader.setUniform("mainLightMatrix",
-                                m_lights[0].getLightSpaceMatrix(true));
 
     m_deferredshader.setUniform("cameraPosition", m_mainCamera->position);
 
@@ -728,7 +677,8 @@ void RenderLoo::loop() {
 
         gbufferPass();
 
-        shadowMapPass();
+        m_shadowMapPass.render(m_scene, m_lights,
+                               m_transparentPass.getAlphaTestThreshold());
 
         if (m_aomethod == AOMethod::SSAO)
             m_ssao.render(*this, *m_gbuffers.position, *m_gbuffers.bufferC);
@@ -738,7 +688,8 @@ void RenderLoo::loop() {
         skyboxPass();
 
         m_transparentPass.render(m_scene, m_skybox, *m_mainCamera,
-                                 *m_mainlightshadowmap, m_lights);
+                                 m_shadowMapPass.getDirectionalShadowMap(),
+                                 m_lights);
 
         if (m_antialiasmethod == AntiAliasMethod::SMAA) {
             beginEvent("SMAA Pass");

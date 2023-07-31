@@ -16,7 +16,7 @@ using namespace glm;
 using namespace loo;
 
 void PBRMetallicMaterial::bind(const ShaderProgram& sp) {
-    ShaderProgram::getUniformBlock(SHADER_BINDING_PORT_MR_PARAM)
+    ShaderProgram::getUniformBlock(SHADER_UB_PORT_MR_PARAM)
         .mapBufferScoped<ShaderPBRMetallicMaterial>(
             [&](ShaderPBRMetallicMaterial& material) {
                 material = m_shadermaterial;
@@ -36,7 +36,7 @@ void PBRMetallicMaterial::bind(const ShaderProgram& sp) {
 }
 void PBRMetallicMaterial::init() {
     ShaderProgram::initUniformBlock(make_unique<UniformBuffer>(
-        SHADER_BINDING_PORT_MR_PARAM, sizeof(ShaderPBRMetallicMaterial)));
+        SHADER_UB_PORT_MR_PARAM, sizeof(ShaderPBRMetallicMaterial)));
 }
 
 shared_ptr<PBRMetallicMaterial> PBRMetallicMaterial::defaultMaterial = nullptr;

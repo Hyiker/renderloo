@@ -51,8 +51,6 @@ void TransparentPass::render(const Scene& scene, const Skybox& skybox,
     m_transparentShader.setTexture(22, skybox.getBRDFLUT());
     m_transparentShader.setTexture(23, mainLightShadowMap);
     m_transparentShader.setUniform("cameraPosition", camera.position);
-    m_transparentShader.setUniform("mainLightMatrix",
-                                   lights[0].getLightSpaceMatrix());
     m_transparentShader.setUniform("alphaTest", 1);
     m_transparentShader.setUniform("alphaTestThreshold", m_alphaTestThreshold);
 

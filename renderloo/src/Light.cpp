@@ -32,13 +32,28 @@ glm::mat4 ShaderLight::getLightSpaceMatrix(bool reverseZ01) const {
         }
     }
 }
+static int
+    shadowedDirectionalLightTileIndex[SHADER_SHADOWED_DIRECTIONAL_LIGHTS_MAX]{};
+static int shadowedDirectionalLightTileIndexCount = 0;
 ShaderLight createDirectionalLight(const glm::vec3& d, const glm::vec3& c,
-                                   float intensity) {
+                                   float intensity, float shadowStrength) {
     ShaderLight direction;
     direction.type = static_cast<int>(LightType::DIRECTIONAL);
     direction.setDirection(d);
     direction.setColor(c);
     direction.intensity = intensity;
+    DirectionalShadowData shadowData;
+    shadowData.strength = shadowStrength;
+    if (shadowStrength > 0.0f) {
+        shadowData.tileIndex = shadowedDirectionalLightTileIndexCount++;
+        shadowedDirectionalLightTileIndex[shadowData.tileIndex] =
+            shadowData.tileIndex;
+        if (shadowedDirectionalLightTileIndexCount >
+            SHADER_SHADOWED_DIRECTIONAL_LIGHTS_MAX) {
+            LOG(ERROR) << "Too many shadowed directional lights!";
+        }
+    }
+    direction.shadowData = shadowData;
     return direction;
 
 }  // namespace loo

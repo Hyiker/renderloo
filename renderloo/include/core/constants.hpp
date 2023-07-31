@@ -22,11 +22,14 @@ constexpr int SHADER_BINDING_PORT_SM_OPACITY = 8;
 constexpr int SHADER_BINDING_PORT_SM_HEIGHT = 9;
 
 // pbr metallic-roughness material binding
-constexpr int SHADER_BINDING_PORT_MR_PARAM = 3;
+constexpr int SHADER_UB_PORT_MR_PARAM = 3;
 constexpr int SHADER_BINDING_PORT_MR_BASECOLOR = 10;
 constexpr int SHADER_BINDING_PORT_MR_OCCLUSION = 11;
 constexpr int SHADER_BINDING_PORT_MR_METALLIC = 12;
 constexpr int SHADER_BINDING_PORT_MR_ROUGHNESS = 13;
 constexpr int SHADER_BINDING_PORT_MR_EMISSIVE = 14;
+
+// directional shadow matrices binding
+constexpr int SHADER_UB_PORT_DIRECTIONAL_SHADOW_MATRICES = 4;
 
 #endif /* HDSSS_INCLUDE_CONSTANTS_HPP */
