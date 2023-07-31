@@ -33,7 +33,7 @@ layout(binding = 7) uniform sampler2D normalTex;
 layout(binding = 20) uniform samplerCube DiffuseConvolved;
 layout(binding = 21) uniform samplerCube SpecularConvolved;
 layout(binding = 22) uniform sampler2D BRDFLUT;
-layout(binding = 23) uniform sampler2D MainLightShadowMap;
+layout(binding = 23) uniform sampler2DShadow MainLightShadowMap;
 
 uniform vec3 cameraPosition;
 uniform int alphaTest;

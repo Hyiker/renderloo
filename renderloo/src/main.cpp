@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
         skyboxDir = *path;
     }
 
-    RenderLoo app(1920, 1080);
+    RenderLoo app(1600, 1600);
     loadScene(app, modelPath.c_str());
     if (!skyboxDir.empty()) {
         app.loadSkybox(skyboxDir);

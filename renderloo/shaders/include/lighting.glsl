@@ -233,7 +233,7 @@ vec3 computeSurfaceIrradiance(in vec3 position, in vec3 normal,
            (distance * distance) * PI_INV;
 }
 
-#define PCF_KERNEL_SIZE 5
+#define PCF_KERNEL_SIZE 1
 
 float computeShadow(in DirectionalShadowData shadowData, in mat4 lightMatrix,
                     in sampler2D shadowMap, in vec3 positionWS) {
@@ -262,6 +262,46 @@ float computeShadow(in DirectionalShadowData shadowData, in mat4 lightMatrix,
     }
     return shadowData.strength * shadow /
            float(PCF_KERNEL_SIZE * PCF_KERNEL_SIZE);
+}
+const float tentWeights5x5[5] = {0.5, 2.0, 3.0, 2.0, 0.5};
+const float tentOffsets5x5[5] = {-2.0, -1.0, 0.0, 1.0, 2.0};
+#define PCF_TENT_KERNEL_SIZE 5
+float computeShadow(in DirectionalShadowData shadowData, in mat4 lightMatrix,
+                    in sampler2DShadow shadowMap, in vec3 positionWS) {
+    if (shadowData.strength == 0.0)
+        return 0.0;
+    vec4 positionLS = lightMatrix * vec4(positionWS, 1.0);
+    vec3 positionNDC = positionLS.xyz / positionLS.w;
+#ifdef REVERSE_Z
+    positionNDC.xy = positionNDC.xy * 0.5 + 0.5;
+#else
+    positionNDC = positionNDC * 0.5 + 0.5;
+#endif
+    float shadow = 0.0;
+    float bias = 0.005;
+    vec2 texelSize = 1.0 / textureSize(shadowMap, 0).xy;
+    float weightSum = 0.0;
+#pragma unroll PCF_TENT_KERNEL_SIZE
+    for (int i = 0; i < PCF_TENT_KERNEL_SIZE; i++) {
+#pragma unroll PCF_TENT_KERNEL_SIZE
+        for (int j = 0; j < PCF_TENT_KERNEL_SIZE; j++) {
+            float weight = tentWeights5x5[i] * tentWeights5x5[j];
+            shadow +=
+                weight * texture(shadowMap,
+                                 vec3(positionNDC.xy + vec2(tentOffsets5x5[i],
+                                                            tentOffsets5x5[j]) *
+                                                           texelSize,
+#ifdef REVERSE_Z
+                                      positionNDC.z + bias
+#else
+                                      positionNDC.z - bias
+#endif
+                                      ))
+                             .r;
+            weightSum += weight;
+        }
+    }
+    return shadowData.strength * shadow / weightSum;
 }
 
 #endif /* RENDERLOO_SHADERS_INCLUDE_LIGHTING_HPP */

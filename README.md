@@ -16,7 +16,8 @@ This is my OpenGL realtime rendering lab based on [loo](https://github.com/Hyike
     - [x] FPS
 - [x] Transparency(2-pass method, alpha test+alpha blend)
 - [x] Shadow
-  - [x] Main light PCF
+  - [x] Main light PCF(5x5 kernel, tent filter)
+  - [ ] Cascaded shadow map
 
 ## Gallery
 

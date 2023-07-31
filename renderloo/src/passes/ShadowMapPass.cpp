@@ -8,7 +8,6 @@
 #include "shaders/shadowmapTransparent.frag.hpp"
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
-
 static constexpr int DIRECTIONAL_SHADOW_MAP_SIZE = 2048;
 using namespace loo;
 
@@ -26,12 +25,16 @@ void ShadowMapPass::init() {
     m_directionalShadowMap->setupStorage(DIRECTIONAL_SHADOW_MAP_SIZE,
                                          DIRECTIONAL_SHADOW_MAP_SIZE,
                                          GL_DEPTH_COMPONENT32F, 1);
-    m_directionalShadowMap->setSizeFilter(GL_NEAREST, GL_NEAREST);
+    m_directionalShadowMap->setSizeFilter(GL_LINEAR, GL_LINEAR);
     m_directionalShadowMap->setWrapFilter(GL_CLAMP_TO_BORDER);
     float borderDepth[] = {0.0f, 0.0f, 0.0f, 0.0f};
     glTextureParameterfv(m_directionalShadowMap->getId(),
                          GL_TEXTURE_BORDER_COLOR, borderDepth);
-
+    // set compare mode to enable shadow comparison
+    glTextureParameteri(m_directionalShadowMap->getId(),
+                        GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+    glTextureParameteri(m_directionalShadowMap->getId(),
+                        GL_TEXTURE_COMPARE_FUNC, GL_LESS);
     m_fb.attachTexture(*m_directionalShadowMap, GL_DEPTH_ATTACHMENT, 0);
     glNamedFramebufferDrawBuffer(m_fb.getId(), GL_NONE);
     glNamedFramebufferReadBuffer(m_fb.getId(), GL_NONE);

@@ -14,7 +14,7 @@ layout(binding = 2) uniform sampler2D GBufferB;
 layout(binding = 3) uniform sampler2D GBufferC;
 // emissive(3) + unused(1)
 layout(binding = 4) uniform sampler2D GBufferD;
-layout(binding = 5) uniform sampler2D MainLightShadowMap;
+layout(binding = 5) uniform sampler2DShadow MainLightShadowMap;
 layout(binding = 6) uniform samplerCube DiffuseConvolved;
 layout(binding = 7) uniform samplerCube SpecularConvolved;
 layout(binding = 8) uniform sampler2D BRDFLUT;
@@ -33,6 +33,7 @@ layout(std140, binding = 1) uniform LightBlock {
 layout(std140, binding = 4) uniform DirectionalShadowMatricesBlock {
     mat4 _DirectionalShadowMatrices[SHADER_SHADOWED_DIRECTIONAL_LIGHTS_MAX];
 };
+
 void main() {
     vec3 positionWS;
     vec3 normalWS;
