@@ -23,3 +23,7 @@ This is my OpenGL realtime rendering lab based on [loo](https://github.com/Hyike
 ![skull](assets/skull.png)
 
 ![gun](assets/gun.png)
+
+![Gun with correct transparency and shadow](assets/gun_transparency_shadow.png)
+
+Gun with correct transparency and shadow

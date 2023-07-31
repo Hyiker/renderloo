@@ -1,6 +1,6 @@
 #version 460
 
-layout(location = 2) in vec2 vTexCoord;
+layout(location = 0) in vec2 vTexCoord;
 
 layout(location = 1) uniform float alphaTestThreshold;
 

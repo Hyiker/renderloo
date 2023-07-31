@@ -1,10 +1,13 @@
 #include "passes/ShadowMapPass.hpp"
+#include <glog/logging.h>
 #include <loo/Scene.hpp>
 #include "core/Graphics.hpp"
 #include "core/constants.hpp"
 #include "shaders/shadowmap.frag.hpp"
 #include "shaders/shadowmap.vert.hpp"
 #include "shaders/shadowmapTransparent.frag.hpp"
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/string_cast.hpp>
 
 static constexpr int DIRECTIONAL_SHADOW_MAP_SIZE = 2048;
 using namespace loo;
@@ -33,6 +36,11 @@ void ShadowMapPass::init() {
     glNamedFramebufferDrawBuffer(m_fb.getId(), GL_NONE);
     glNamedFramebufferReadBuffer(m_fb.getId(), GL_NONE);
     panicPossibleGLError();
+
+    // init directional shadow matrices buffer
+    ShaderProgram::initUniformBlock(std::make_unique<UniformBuffer>(
+        SHADER_UB_PORT_DIRECTIONAL_SHADOW_MATRICES,
+        sizeof(ShaderDirectionalShadowMatricesBlock)));
 }
 void ShadowMapPass::render(const loo::Scene& scene,
                            const std::vector<ShaderLight>& lights,
@@ -48,12 +56,12 @@ void ShadowMapPass::render(const loo::Scene& scene,
     glClearDepth(0.0f);
     glClear(GL_DEPTH_BUFFER_BIT);
 
-    m_opaqueShader.use();
     ShaderDirectionalShadowMatricesBlock block{};
     auto sceneModelMatrix = scene.getModelMatrix();
     for (auto& light : lights) {
         if (light.type == static_cast<int>(LightType::DIRECTIONAL) &&
             light.shadowData.strength > 0.f) {
+            m_opaqueShader.use();
             int tileIndex = light.shadowData.tileIndex;
             // TODO set viewport to support multiple directional light shadows
             glm::mat4 lightSpaceMatrix = light.getLightSpaceMatrix(true);
@@ -63,6 +71,12 @@ void ShadowMapPass::render(const loo::Scene& scene,
                 if (mesh->needAlphaBlend() &&
                     transparentShadowMode == TransparentShadowMode::AlphaTest)
                     continue;
+                if (mesh->isDoubleSided()) {
+                    glDisable(GL_CULL_FACE);
+                } else {
+                    glEnable(GL_CULL_FACE);
+                    glCullFace(GL_BACK);
+                }
                 drawMesh(*mesh, sceneModelMatrix, m_opaqueShader);
             }
             // if we render in solid mode, no need for special treatment of transparency
@@ -77,6 +91,12 @@ void ShadowMapPass::render(const loo::Scene& scene,
             for (auto mesh : scene.getMeshes()) {
                 if (!mesh->needAlphaBlend())
                     continue;
+                if (mesh->isDoubleSided()) {
+                    glDisable(GL_CULL_FACE);
+                } else {
+                    glEnable(GL_CULL_FACE);
+                    glCullFace(GL_BACK);
+                }
                 drawMesh(*mesh, sceneModelMatrix, m_transparentShader);
             }
         }

@@ -1,6 +1,5 @@
-#include "core/Light.hpp"
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
-#include <glm/glm.hpp>
+#include "core/Light.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 #include "loo/glError.hpp"
 
@@ -16,14 +15,14 @@ glm::mat4 ShaderLight::getLightSpaceMatrix(bool reverseZ01) const {
             glm::vec3 up{0.0f, 1.0f, 0.0f};
             if (direction.x == 0.0f && direction.z == 0.0f)
                 up = glm::vec3(1.0f, 0.0f, 0.0f);
-            float boxSize = 20.0f;
+            float boxSize = 15.0f;
             glm::mat4 lookAt = glm::lookAt(
                 glm::vec3(0, 0, 0), glm::normalize(glm::vec3(direction)), up);
-            float zNear = -20.0f, zFar = 20.0f;
+            float zNear = -8.0f, zFar = 8.0f;
             if (reverseZ01) {
                 std::swap(zNear, zFar);
             }
-            return glm::ortho<float>(boxSize, -boxSize, boxSize, -boxSize,
+            return glm::ortho<float>(-boxSize, boxSize, -boxSize, boxSize,
                                      zNear, zFar) *
                    lookAt;
         }

@@ -185,10 +185,6 @@ RenderLoo::RenderLoo(int width, int height)
     // init lights buffer
     ShaderProgram::initUniformBlock(std::make_unique<UniformBuffer>(
         SHADER_UB_PORT_LIGHTS, sizeof(ShaderLightBlock)));
-    // init directional shadow matrices buffer
-    ShaderProgram::initUniformBlock(std::make_unique<UniformBuffer>(
-        SHADER_UB_PORT_DIRECTIONAL_SHADOW_MATRICES,
-        sizeof(ShaderDirectionalShadowMatricesBlock)));
     // init mvp uniform buffer
     ShaderProgram::initUniformBlock(
         std::make_unique<UniformBuffer>(SHADER_UB_PORT_MVP, sizeof(MVP)));
