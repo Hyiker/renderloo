@@ -8,7 +8,7 @@ layout(location = 0) out vec3 FragColor;
 
 layout(binding = 0, location = 3) uniform samplerCube envMap;
 layout(location = 4) uniform float roughness;
-const uint N_SAMPLES = 1024;
+const uint N_SAMPLES = 512;
 #ifndef PI
 #define PI 3.14159265358979323846
 #define PI_INV 0.31830988618379067154

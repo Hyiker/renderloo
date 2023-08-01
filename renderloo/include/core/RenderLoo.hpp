@@ -27,7 +27,9 @@
 #include "ao/AO.hpp"
 #include "core/Deferred.hpp"
 #include "core/FinalProcess.hpp"
+#include "passes/BloomPass.hpp"
 #include "passes/DebugOutputPass.hpp"
+
 
 enum RenderFlag {
     RenderFlag_Opaque = 1 << 0,
@@ -92,7 +94,7 @@ class RenderLoo : public loo::Application {
     std::shared_ptr<loo::Texture2D> m_deferredResult;
 
     TransparentPass m_transparentPass;
-
+    BloomPass m_bloomPass;
     // antialias
     AntiAliasMethod m_antialiasmethod{AntiAliasMethod::SMAA};
     SMAA m_smaa;

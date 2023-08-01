@@ -173,6 +173,7 @@ RenderLoo::RenderLoo(int width, int height)
     m_ssao.init();
     initDeferredPass();
     m_transparentPass.init(*m_gbuffers.depthStencil, *m_deferredResult);
+    m_bloomPass.init(getWidth(), getHeight());
     m_smaa.init();
 
     // final pass related
@@ -416,8 +417,7 @@ void RenderLoo::gui() {
                 const char* antialiasmethod[] = {"None", "SMAA"};
                 ImGui::Combo("Antialias", (int*)(&m_antialiasmethod),
                              antialiasmethod, IM_ARRAYSIZE(antialiasmethod));
-                const char* ambientocclusionmethod[] = {"None", "SSAO", "HBAO",
-                                                        "GTAO"};
+                const char* ambientocclusionmethod[] = {"None", "SSAO", "GTAO"};
                 ImGui::Combo("AO", (int*)(&m_aomethod), ambientocclusionmethod,
                              IM_ARRAYSIZE(ambientocclusionmethod));
                 if (m_aomethod == AOMethod::SSAO) {
@@ -677,6 +677,8 @@ void RenderLoo::loop() {
         m_transparentPass.render(m_scene, m_skybox, *m_mainCamera,
                                  m_shadowMapPass.getDirectionalShadowMap(),
                                  m_enableDFGCompensation);
+
+        m_bloomPass.render(*m_deferredResult, *m_gbuffers.bufferD);
 
         if (m_antialiasmethod == AntiAliasMethod::SMAA) {
             beginEvent("SMAA Pass");

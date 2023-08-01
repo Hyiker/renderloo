@@ -1,0 +1,26 @@
+#version 460 core
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(rgba32f, binding = 0) uniform image2D InputLevel;
+layout(rgba32f, binding = 1) uniform image2D OutputLevel;
+
+const float GAUSSIAN_KERNEL[] =
+    float[](0.06136, 0.24477, 0.38774, 0.24477, 0.06136);
+void main() {
+    // dispatch size = OutputLevel size, use uv to sample InputLevel
+    ivec2 outputCoord = ivec2(gl_GlobalInvocationID.xy);
+    vec2 uv = gl_GlobalInvocationID.xy / vec2(imageSize(OutputLevel));
+    ivec2 inputLevelCoordBase = ivec2(uv * vec2(imageSize(InputLevel)));
+    vec3 sum = vec3(0.0);
+    float weightSum = 0.0;
+    for (int i = -2; i <= 2; i++) {
+        for (int j = -2; j <= 2; j++) {
+            float weight = GAUSSIAN_KERNEL[i + 2] * GAUSSIAN_KERNEL[j + 2];
+            sum +=
+                imageLoad(InputLevel, inputLevelCoordBase + ivec2(i, j)).rgb *
+                weight;
+            weightSum += weight;
+        }
+    }
+    imageStore(OutputLevel, outputCoord, vec4(sum / weightSum, 1.0));
+}

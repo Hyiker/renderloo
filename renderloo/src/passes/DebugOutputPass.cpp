@@ -20,6 +20,7 @@ void DebugOutputPass::init(int width, int height) {
 }
 
 void DebugOutputPass::render(const GBuffer& gbuffer, const loo::Texture2D& ao) {
+    Application::beginEvent("DebugOutputPass");
     m_fb.bind();
     m_fb.attachTexture(*gbuffer.depthStencil, GL_DEPTH_STENCIL_ATTACHMENT, 0);
 
@@ -44,4 +45,5 @@ void DebugOutputPass::render(const GBuffer& gbuffer, const loo::Texture2D& ao) {
 
     logPossibleGLError();
     m_fb.unbind();
+    Application::endEvent();
 }

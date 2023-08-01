@@ -4,8 +4,7 @@
 enum class AOMethod : int {
     None = 0,
     SSAO = 1,
-    HBAO = 2,
-    GTAO = 3,
+    GTAO = 2,
     // RTAO = 4,
 };
 

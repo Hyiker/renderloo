@@ -5,7 +5,7 @@ add_rules("mode.debug", "mode.release")
 -- glslc toolchain
 -- reference: https://github.com/xmake-io/xmake/blob/63e4d08d20a935acf47ac86beb587e9261b78506/xmake/rules/utils/glsl2spv/xmake.lua
 rule("glsl2hpp")
-    set_extensions(".vert", ".tesc", ".tese", ".geom", ".comp", ".frag", ".comp", ".mesh",
+    set_extensions(".vert", ".tesc", ".tese", ".geom", ".comp", ".frag", ".compute", ".mesh",
      ".task", ".rgen", ".rint", ".rahit", ".rchit", ".rmiss", ".rcall", ".glsl")
     before_buildcmd_file(function (target, batchcmds, sourcefile_glsl, opt)
         import("lib.detect.find_tool")
