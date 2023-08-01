@@ -395,6 +395,8 @@ void RenderLoo::gui() {
                                         ImGuiTreeNodeFlags_DefaultOpen)) {
                 ImGui::Checkbox("Wire frame mode", &m_wireframe);
                 ImGui::Checkbox("Normal mapping", &m_enablenormal);
+                ImGui::Checkbox("Enable DFG Compensation",
+                                &m_enableDFGCompensation);
                 const char* debugOutputItems[7] = {
                     "None",   "Base Color", "Metalness", "Roughness",
                     "Normal", "Emission",   "AO"};
@@ -579,6 +581,7 @@ void RenderLoo::deferredPass() {
     m_deferredshader.setTexture(9, aoTex);
 
     m_deferredshader.setUniform("cameraPosition", m_mainCamera->position);
+    m_deferredshader.setUniform("enableCompensation", m_enableDFGCompensation);
 
     ShaderProgram::getUniformBlock(SHADER_UB_PORT_LIGHTS)
         .mapBufferScoped<ShaderLightBlock>([&](ShaderLightBlock& lights) {
@@ -673,7 +676,7 @@ void RenderLoo::loop() {
 
         m_transparentPass.render(m_scene, m_skybox, *m_mainCamera,
                                  m_shadowMapPass.getDirectionalShadowMap(),
-                                 m_lights);
+                                 m_enableDFGCompensation);
 
         if (m_antialiasmethod == AntiAliasMethod::SMAA) {
             beginEvent("SMAA Pass");

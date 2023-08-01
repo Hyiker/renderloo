@@ -23,7 +23,7 @@ void TransparentPass::init(const Texture2D& depthStencil,
 void TransparentPass::render(const Scene& scene, const Skybox& skybox,
                              const Camera& camera,
                              const Texture2D& mainLightShadowMap,
-                             const std::vector<ShaderLight>& lights) {
+                             bool enableCompensation) {
     Application::beginEvent("Transparent Pass");
     m_transparentfb.bind();
     glEnable(GL_BLEND);
@@ -55,6 +55,7 @@ void TransparentPass::render(const Scene& scene, const Skybox& skybox,
     m_transparentShader.setUniform("cameraPosition", camera.position);
     m_transparentShader.setUniform("alphaTest", 1);
     m_transparentShader.setUniform("alphaTestThreshold", m_alphaTestThreshold);
+    m_transparentShader.setUniform("enableCompensation", enableCompensation);
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_GREATER);

@@ -1,6 +1,7 @@
 #include "core/Skybox.hpp"
 #include <glog/logging.h>
 #include <stb/stb_image.h>
+#include <stb/stb_image_write.h>
 #include <filesystem>
 #include <glm/gtc/matrix_transform.hpp>
 #include <unordered_map>
@@ -61,9 +62,7 @@ Skybox::Skybox()
           Shader(ENVMAPDIFFUSECONVOLUTION_FRAG, ShaderType::Fragment)},
       m_specularConvShader{
           Shader(EQUIRECTANGULARMAPPER_VERT, ShaderType::Vertex),
-          Shader(ENVMAPSPECULARCONVOLUTION_FRAG, ShaderType::Fragment)},
-      m_BRDFLUTShader{Shader(FINALSCREEN_VERT, ShaderType::Vertex),
-                      Shader(BRDFLUT_FRAG, ShaderType::Fragment)} {
+          Shader(ENVMAPSPECULARCONVOLUTION_FRAG, ShaderType::Fragment)} {
     constexpr float skyboxVertices[] = {
         // positions
         -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f,
@@ -190,23 +189,48 @@ void Skybox::convolveSpecularEnvmap() {
     }
     helper.framebuffer.unbind();
 }
-
-void Skybox::initBRDFLUT() {
+static const char* BRDFLUT_FILENAME = "brdfLUT.png";
+void Skybox::initBRDFLUT(bool forceRecompute) {
     m_BRDFLUT = make_unique<Texture2D>();
     m_BRDFLUT->init();
-    m_BRDFLUT->setupStorage(BRDFLUT_SIZE, BRDFLUT_SIZE, GL_RG16F, 1);
     m_BRDFLUT->setWrapFilter(GL_CLAMP_TO_EDGE);
     m_BRDFLUT->setSizeFilter(GL_LINEAR, GL_LINEAR);
+    // try to load from file
+    stbi_set_flip_vertically_on_load(true);
+    int width, height, channels;
+    unsigned char* data =
+        stbi_load(BRDFLUT_FILENAME, &width, &height, &channels, 2);
+    bool success = data && width == BRDFLUT_SIZE && height == BRDFLUT_SIZE;
+    if (forceRecompute || !success) {
+        ShaderProgram BRDFPrecomputeShader{
+            Shader(FINALSCREEN_VERT, ShaderType::Vertex),
+            Shader(BRDFLUT_FRAG, ShaderType::Fragment)};
+        m_BRDFLUT->setupStorage(BRDFLUT_SIZE, BRDFLUT_SIZE, GL_RGB16F, 1);
 
-    helper.framebuffer.bind();
-    helper.renderbuffer.set(GL_DEPTH_COMPONENT24, BRDFLUT_SIZE, BRDFLUT_SIZE);
-    m_BRDFLUTShader.use();
-    glViewport(0, 0, BRDFLUT_SIZE, BRDFLUT_SIZE);
-    glNamedFramebufferTexture(helper.framebuffer.getId(), GL_COLOR_ATTACHMENT0,
-                              m_BRDFLUT->getId(), 0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    Quad::globalQuad().draw();
-    helper.framebuffer.unbind();
+        helper.framebuffer.bind();
+        helper.renderbuffer.set(GL_DEPTH_COMPONENT24, BRDFLUT_SIZE,
+                                BRDFLUT_SIZE);
+        BRDFPrecomputeShader.use();
+        glViewport(0, 0, BRDFLUT_SIZE, BRDFLUT_SIZE);
+        glNamedFramebufferTexture(helper.framebuffer.getId(),
+                                  GL_COLOR_ATTACHMENT0, m_BRDFLUT->getId(), 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        Quad::globalQuad().draw();
+        helper.framebuffer.unbind();
+
+        int width = BRDFLUT_SIZE, height = BRDFLUT_SIZE;
+        std::vector<unsigned char> data(width * height * 2);
+        glGetTextureImage(m_BRDFLUT->getId(), 0, GL_RG, GL_UNSIGNED_BYTE,
+                          data.size(), data.data());
+        stbi_flip_vertically_on_write(true);
+        stbi_write_png(BRDFLUT_FILENAME, width, height, 2, data.data(),
+                       width * 2);
+    } else {
+        m_BRDFLUT->setup(data, width, height, GL_RG16F, GL_RG, GL_UNSIGNED_BYTE,
+                         1);
+        stbi_image_free(data);
+    }
+    panicPossibleGLError();
 }
 
 void Skybox::loadTexture(const std::string& path) {

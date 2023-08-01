@@ -40,11 +40,11 @@ class Skybox {
     void renderEquirectangularToCubemap(const loo::Texture2D& equiTexture);
     void convolveDiffuseEnvmap();
     void convolveSpecularEnvmap();
-    void initBRDFLUT();
+    void initBRDFLUT(bool forceRecompute = false);
     GLuint vao, vbo;
     loo::ShaderProgram m_shader;
     loo::ShaderProgram m_equirectangularToCubemapShader, m_diffuseConvShader,
-        m_specularConvShader, m_BRDFLUTShader;
+        m_specularConvShader;
     std::unique_ptr<loo::TextureCubeMap> m_envmap{}, m_diffuseConv{},
         m_specularConv{};
     std::unique_ptr<loo::Texture2D> m_BRDFLUT{};

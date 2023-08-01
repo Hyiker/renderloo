@@ -12,7 +12,7 @@ class TransparentPass {
     void render(const loo::Scene& scene, const Skybox& skybox,
                 const loo::Camera& camera,
                 const loo::Texture2D& mainLightShadowMap,
-                const std::vector<ShaderLight>& lights);
+                bool enableCompensation);
     [[nodiscard]] auto getAlphaTestThreshold() const {
         return m_alphaTestThreshold;
     }

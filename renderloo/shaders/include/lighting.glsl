@@ -197,7 +197,9 @@ vec3 computePBRMetallicRoughnessIBLSpecular(
     // diffuse irradiance has already been divided by PI, no need to do it here
     vec3 specularIrradiance =
         textureLod(specularConvolved, reflect(-V, N), mipLevel).rgb;
-    return specularIrradiance * (F0 * brdfScaleBias.r + brdfScaleBias.g);
+    vec3 fr = (F0 * brdfScaleBias.r + brdfScaleBias.g);
+    // vec3 fr = mix(brdfScaleBias.rrr, brdfScaleBias.ggg, F0);
+    return specularIrradiance * fr;
 }
 
 void computeBlinnPhongLocalLighting(in SurfaceParamsBlinnPhong surfaceParams,

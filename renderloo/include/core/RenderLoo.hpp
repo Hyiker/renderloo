@@ -105,6 +105,7 @@ class RenderLoo : public loo::Application {
     bool m_wireframe{false};
     bool m_enablenormal{true};
     bool m_screenshotflag{false};
+    bool m_enableDFGCompensation{true};
 
     FinalPassOptions m_finalpassoptions;
 
