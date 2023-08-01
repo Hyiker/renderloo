@@ -21,8 +21,7 @@ void DebugOutputPass::init(int width, int height) {
 
 void DebugOutputPass::render(const GBuffer& gbuffer, const loo::Texture2D& ao) {
     m_fb.bind();
-    m_fb.attachRenderbuffer(gbuffer.depthStencilRb,
-                            GL_DEPTH_STENCIL_ATTACHMENT);
+    m_fb.attachTexture(*gbuffer.depthStencil, GL_DEPTH_STENCIL_ATTACHMENT, 0);
 
     glClearColor(0, 0, 0, 1);
     glDisable(GL_DEPTH_TEST);
@@ -36,7 +35,6 @@ void DebugOutputPass::render(const GBuffer& gbuffer, const loo::Texture2D& ao) {
     m_debugOutputShader.setTexture(2, *gbuffer.bufferC);
     m_debugOutputShader.setTexture(3, *gbuffer.bufferD);
     m_debugOutputShader.setTexture(4, ao);
-    m_debugOutputShader.setTexture(5, ao);
     m_debugOutputShader.setUniform("mode", static_cast<int>(debugOutputOption));
 
     Quad::globalQuad().draw();

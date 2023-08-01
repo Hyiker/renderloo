@@ -13,10 +13,11 @@ TransparentPass::TransparentPass()
           Shader(TRANSPARENT_FRAG, ShaderType::Fragment),
       } {}
 
-void TransparentPass::init(const Renderbuffer& rb, const Texture2D& output) {
+void TransparentPass::init(const Texture2D& depthStencil,
+                           const Texture2D& output) {
     m_transparentfb.init();
     m_transparentfb.attachTexture(output, GL_COLOR_ATTACHMENT0, 0);
-    m_transparentfb.attachRenderbuffer(rb, GL_DEPTH_ATTACHMENT);
+    m_transparentfb.attachTexture(depthStencil, GL_DEPTH_ATTACHMENT, 0);
     panicPossibleGLError();
 }
 void TransparentPass::render(const Scene& scene, const Skybox& skybox,

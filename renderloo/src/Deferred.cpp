@@ -1,4 +1,5 @@
 #include "core/Deferred.hpp"
+#include <memory>
 using namespace loo;
 using namespace std;
 void GBuffer::init(int width, int height) {
@@ -26,10 +27,13 @@ void GBuffer::init(int width, int height) {
 
     bufferD = make_unique<Texture2D>();
     bufferD->init();
-    bufferD->setupStorage(width, height, GL_RGBA32F, 1);
+    bufferD->setupStorage(width, height, GL_RGBA32F, mipmapLevel);
     bufferD->setSizeFilter(GL_LINEAR, GL_LINEAR);
 
     panicPossibleGLError();
 
-    depthStencilRb.init(GL_DEPTH24_STENCIL8, width, height);
+    depthStencil = make_unique<Texture2D>();
+    depthStencil->init();
+    depthStencil->setupStorage(width, height, GL_DEPTH24_STENCIL8, 1);
+    depthStencil->setSizeFilter(GL_LINEAR, GL_LINEAR);
 }

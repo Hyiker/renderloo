@@ -10,12 +10,13 @@ class SSAO {
 
    public:
     SSAO(int width, int height);
-    void init(const loo::Renderbuffer& rb);
+    void init();
     void render(const loo::Application& app, const loo::Texture2D& position,
-                const loo::Texture2D& normal);
+                const loo::Texture2D& normal,
+                const loo::Texture2D& depthStencil);
     const loo::Texture2D& getAOTexture() const { return *m_result; }
 
-    float bias = 0.03f, radius = 0.5f;
+    float bias = 0.0001f, radius = 0.5f;
 
    private:
     void initRandomTexture();

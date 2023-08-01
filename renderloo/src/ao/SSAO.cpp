@@ -15,30 +15,30 @@ SSAO::SSAO(int width, int height)
       m_ssaoPass2Shader{Shader(FINALSCREEN_VERT, ShaderType::Vertex),
                         Shader(SSAOPASS2_FRAG, ShaderType::Fragment)} {}
 
-void SSAO::init(const Renderbuffer& rb) {
+void SSAO::init() {
     m_fb.init();
     m_result = std::make_unique<loo::Texture2D>();
     m_result->init();
-    m_result->setupStorage(m_width, m_height, GL_R8, 1);
+    m_result->setupStorage(m_width, m_height, GL_R32F, 1);
     m_result->setSizeFilter(GL_LINEAR, GL_LINEAR);
     m_result->setWrapFilter(GL_CLAMP_TO_EDGE);
 
     m_blurSource = std::make_unique<loo::Texture2D>();
     m_blurSource->init();
-    m_blurSource->setupStorage(m_width, m_height, GL_R8, 1);
+    m_blurSource->setupStorage(m_width, m_height, GL_R32F, 1);
     m_blurSource->setSizeFilter(GL_LINEAR, GL_LINEAR);
     m_blurSource->setWrapFilter(GL_CLAMP_TO_EDGE);
 
-    m_fb.attachRenderbuffer(rb, GL_STENCIL_ATTACHMENT);
     initKernel();
     initRandomTexture();
 }
 
-void SSAO::render(const loo::Application& app, const loo::Texture2D& position,
-                  const loo::Texture2D& normal) {
+void SSAO::render(const loo::Application& app, const Texture2D& position,
+                  const Texture2D& normal, const Texture2D& depthStencil) {
     app.beginEvent("SSAO");
     app.beginEvent("Pass 1 - kernel sampling");
     m_fb.bind();
+    m_fb.attachTexture(depthStencil, GL_STENCIL_ATTACHMENT, 0);
     m_fb.attachTexture(*m_blurSource, GL_COLOR_ATTACHMENT0, 0);
     m_fb.enableAttachments({GL_COLOR_ATTACHMENT0});
     glClearColor(0.0, 0.0, 0.0, 0.0);
@@ -56,7 +56,8 @@ void SSAO::render(const loo::Application& app, const loo::Texture2D& position,
                                  glm::vec2(m_width, m_height));
     m_ssaoPass1Shader.setTexture(0, position);
     m_ssaoPass1Shader.setTexture(1, normal);
-    m_ssaoPass1Shader.setTexture(2, *m_noise);
+    m_ssaoPass1Shader.setTexture(2, depthStencil);
+    m_ssaoPass1Shader.setTexture(3, *m_noise);
     m_ssaoPass1Shader.setUniform("bias", bias);
     m_ssaoPass1Shader.setUniform("radius", radius);
     Quad::globalQuad().draw();

@@ -8,7 +8,7 @@
 class TransparentPass {
    public:
     TransparentPass();
-    void init(const loo::Renderbuffer& rb, const loo::Texture2D& output);
+    void init(const loo::Texture2D& depthStencil, const loo::Texture2D& output);
     void render(const loo::Scene& scene, const Skybox& skybox,
                 const loo::Camera& camera,
                 const loo::Texture2D& mainLightShadowMap,

@@ -106,19 +106,19 @@ static std::unique_ptr<loo::PerspectiveCamera> placeCameraBySceneAABB(
     vec3 center = aabb.getCenter();
     vec3 diagonal = aabb.getDiagonal();
     float r = std::max(diagonal.x, diagonal.y) / 2.0;
-    constexpr float EXPECTED_FOV = 60.f;
+    constexpr float EXPECTED_FOV = 60.f, ZNEAR = 0.01f, ZFAR = 30.f;
     float dist = r / sin(glm::radians(EXPECTED_FOV) / 2.0);
     float overlookAngle = glm::radians(45.f);
     float y = dist * tan(overlookAngle);
     vec3 pos = center + vec3(0, y, dist);
     if (mode == CameraMode::FPS)
-        return std::make_unique<FPSCamera>(pos, center, vec3(0, 1, 0), 0.01f,
-                                           std::max(100.0f, dist + r),
+        return std::make_unique<FPSCamera>(pos, center, vec3(0, 1, 0), ZNEAR,
+                                           std::max(ZFAR, dist + r),
                                            EXPECTED_FOV);
     else if (mode == CameraMode::ArcBall)
-        return std::make_unique<ArcBallCamera>(
-            pos, center, vec3(0, 1, 0), 0.01f, std::max(100.0f, dist + r),
-            EXPECTED_FOV);
+        return std::make_unique<ArcBallCamera>(pos, center, vec3(0, 1, 0),
+                                               ZNEAR, std::max(ZFAR, dist + r),
+                                               EXPECTED_FOV);
     else
         return nullptr;
 }
@@ -170,9 +170,9 @@ RenderLoo::RenderLoo(int width, int height)
 
     initGBuffers();
     m_shadowMapPass.init();
-    m_ssao.init(m_gbuffers.depthStencilRb);
+    m_ssao.init();
     initDeferredPass();
-    m_transparentPass.init(m_gbuffers.depthStencilRb, *m_deferredResult);
+    m_transparentPass.init(*m_gbuffers.depthStencil, *m_deferredResult);
     m_smaa.init();
 
     // final pass related
@@ -209,8 +209,8 @@ void RenderLoo::initGBuffers() {
     m_gbufferfb.attachTexture(*m_gbuffers.bufferB, GL_COLOR_ATTACHMENT2, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.bufferC, GL_COLOR_ATTACHMENT3, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.bufferD, GL_COLOR_ATTACHMENT4, 0);
-    m_gbufferfb.attachRenderbuffer(m_gbuffers.depthStencilRb,
-                                   GL_DEPTH_STENCIL_ATTACHMENT);
+    m_gbufferfb.attachTexture(*m_gbuffers.depthStencil,
+                              GL_DEPTH_STENCIL_ATTACHMENT, 0);
 }
 void RenderLoo::initDeferredPass() {
     m_deferredfb.init();
@@ -220,8 +220,8 @@ void RenderLoo::initDeferredPass() {
     m_deferredResult->setSizeFilter(GL_LINEAR, GL_LINEAR);
 
     m_deferredfb.attachTexture(*m_deferredResult, GL_COLOR_ATTACHMENT0, 0);
-    m_deferredfb.attachRenderbuffer(m_gbuffers.depthStencilRb,
-                                    GL_DEPTH_ATTACHMENT);
+    m_deferredfb.attachTexture(*m_gbuffers.depthStencil, GL_DEPTH_ATTACHMENT,
+                               0);
     panicPossibleGLError();
 }
 
@@ -664,7 +664,8 @@ void RenderLoo::loop() {
                                m_transparentPass.getAlphaTestThreshold());
 
         if (m_aomethod == AOMethod::SSAO)
-            m_ssao.render(*this, *m_gbuffers.position, *m_gbuffers.bufferC);
+            m_ssao.render(*this, *m_gbuffers.position, *m_gbuffers.bufferC,
+                          *m_gbuffers.depthStencil);
 
         deferredPass();
 

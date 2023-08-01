@@ -13,7 +13,7 @@ struct GBuffer {
     std::unique_ptr<loo::Texture2D> bufferC;
     // emissive(3) + unused(1)
     std::unique_ptr<loo::Texture2D> bufferD;
-    loo::Renderbuffer depthStencilRb;
+    std::unique_ptr<loo::Texture2D> depthStencil;
 
     void init(int width, int height);
 };
