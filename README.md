@@ -8,7 +8,8 @@ This is my OpenGL realtime rendering lab based on [loo](https://github.com/Hyike
   - [x] Deferred shading
   - [ ] Forward+(under construction)
 - [x] Physically based rendering
-  - [x] Metallic-roughness workflow
+  - [x] Metallic-roughness workflow(GGX)
+  - [ ] Kulla-Conty energy compensation
   - [x] IBL
 - [x] Camera
   - [x] Perspective
@@ -18,6 +19,14 @@ This is my OpenGL realtime rendering lab based on [loo](https://github.com/Hyike
 - [x] Shadow
   - [x] Main light PCF(5x5 kernel, tent filter)
   - [ ] Cascaded shadow map
+- [x] tone mapping
+  - [x] ACES
+- [x] Model format support
+  - [x] glTF 2.0(strongly recommended, since it enables full PBR support)
+  - [x] any other formats supported by Assimp
+- [ ] Anti-aliasing
+  - [x] SMAA(1x only)
+  - [ ] TAA(under construction)
 
 ## Gallery
 
