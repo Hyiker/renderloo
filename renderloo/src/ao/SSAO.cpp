@@ -19,13 +19,13 @@ void SSAO::init() {
     m_fb.init();
     m_result = std::make_unique<loo::Texture2D>();
     m_result->init();
-    m_result->setupStorage(m_width, m_height, GL_R32F, 1);
+    m_result->setupStorage(m_width, m_height, GL_R8, 1);
     m_result->setSizeFilter(GL_LINEAR, GL_LINEAR);
     m_result->setWrapFilter(GL_CLAMP_TO_EDGE);
 
     m_blurSource = std::make_unique<loo::Texture2D>();
     m_blurSource->init();
-    m_blurSource->setupStorage(m_width, m_height, GL_R32F, 1);
+    m_blurSource->setupStorage(m_width, m_height, GL_R8, 1);
     m_blurSource->setSizeFilter(GL_LINEAR, GL_LINEAR);
     m_blurSource->setWrapFilter(GL_CLAMP_TO_EDGE);
 
@@ -44,6 +44,8 @@ void SSAO::render(const loo::Application& app, const Texture2D& position,
     glClearColor(0.0, 0.0, 0.0, 0.0);
     glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
+    glEnable(GL_STENCIL_TEST);
+    glStencilFunc(GL_EQUAL, 1, 0xFF);
     // disable stencil write
     glStencilMask(0x00);
 
@@ -73,6 +75,7 @@ void SSAO::render(const loo::Application& app, const Texture2D& position,
     app.endEvent();
 
     glEnable(GL_DEPTH_TEST);
+    glDisable(GL_STENCIL_TEST);
     // enable stencil write
     glStencilMask(0xFF);
     app.endEvent();
