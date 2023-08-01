@@ -25,7 +25,9 @@
 #include <loo/Animation.hpp>
 #include "antialias/AA.hpp"
 #include "ao/AO.hpp"
+#include "core/Deferred.hpp"
 #include "core/FinalProcess.hpp"
+#include "passes/DebugOutputPass.hpp"
 
 enum RenderFlag {
     RenderFlag_Opaque = 1 << 0,
@@ -52,13 +54,11 @@ class RenderLoo : public loo::Application {
 
     void loop() override;
     void animation();
-    void gui();
+    void gui() override;
     void scene(loo::ShaderProgram& shader, RenderFlag flag = RenderFlag_All);
     void skyboxPass();
     // first pass: gbuffer
     void gbufferPass();
-    // second pass: shadow map
-    void shadowMapPass();
     // third pass: deferred pass(illumination)
     void deferredPass();
 
@@ -80,18 +80,7 @@ class RenderLoo : public loo::Application {
     ShadowMapPass m_shadowMapPass;
 
     // gbuffer
-    struct GBuffer {
-        std::unique_ptr<loo::Texture2D> position;
-        // base color(3) + unused(1)
-        std::unique_ptr<loo::Texture2D> bufferA;
-        // metallic(1) + padding(2) + occlusion(1)
-        std::unique_ptr<loo::Texture2D> bufferB;
-        // normal(3) + roughness(1)
-        std::unique_ptr<loo::Texture2D> bufferC;
-        // emissive(3) + unused(1)
-        std::unique_ptr<loo::Texture2D> bufferD;
-        loo::Renderbuffer depthStencilRb;
-    } m_gbuffers;
+    GBuffer m_gbuffers;
     loo::Framebuffer m_gbufferfb;
     // ambient occlusion
     AOMethod m_aomethod{AOMethod::SSAO};
@@ -110,6 +99,9 @@ class RenderLoo : public loo::Application {
 
     // process
     FinalProcess m_finalprocess;
+    // debug
+    DebugOutputPass m_debugOutputPass;
+
     bool m_wireframe{false};
     bool m_enablenormal{true};
     bool m_screenshotflag{false};

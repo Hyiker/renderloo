@@ -106,7 +106,7 @@ static std::unique_ptr<loo::PerspectiveCamera> placeCameraBySceneAABB(
     vec3 center = aabb.getCenter();
     vec3 diagonal = aabb.getDiagonal();
     float r = std::max(diagonal.x, diagonal.y) / 2.0;
-    constexpr float EXPECTED_FOV = 90.f;
+    constexpr float EXPECTED_FOV = 60.f;
     float dist = r / sin(glm::radians(EXPECTED_FOV) / 2.0);
     float overlookAngle = glm::radians(45.f);
     float y = dist * tan(overlookAngle);
@@ -177,6 +177,7 @@ RenderLoo::RenderLoo(int width, int height)
 
     // final pass related
     { m_finalprocess.init(); }
+    m_debugOutputPass.init(getWidth(), getHeight());
     // create sun light
     if (m_lights.empty()) {
         m_lights.push_back(
@@ -201,41 +202,7 @@ RenderLoo::RenderLoo(int width, int height)
 void RenderLoo::initGBuffers() {
     m_gbufferfb.init();
 
-    int mipmapLevel = mipmapLevelFromSize(getWidth(), getHeight());
-
-    m_gbuffers.position = make_unique<Texture2D>();
-    m_gbuffers.position->init();
-    m_gbuffers.position->setupStorage(getWidth(), getHeight(), GL_RGBA32F,
-                                      mipmapLevel);
-    m_gbuffers.position->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
-
-    m_gbuffers.bufferA = make_unique<Texture2D>();
-    m_gbuffers.bufferA->init();
-    m_gbuffers.bufferA->setupStorage(getWidth(), getHeight(), GL_RGBA32F,
-                                     mipmapLevel);
-    m_gbuffers.bufferA->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
-
-    m_gbuffers.bufferB = make_unique<Texture2D>();
-    m_gbuffers.bufferB->init();
-    m_gbuffers.bufferB->setupStorage(getWidth(), getHeight(), GL_RGBA32F,
-                                     mipmapLevel);
-    m_gbuffers.bufferB->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
-
-    m_gbuffers.bufferC = make_unique<Texture2D>();
-    m_gbuffers.bufferC->init();
-    m_gbuffers.bufferC->setupStorage(getWidth(), getHeight(), GL_RGBA32F,
-                                     mipmapLevel);
-    m_gbuffers.bufferC->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
-
-    m_gbuffers.bufferD = make_unique<Texture2D>();
-    m_gbuffers.bufferD->init();
-    m_gbuffers.bufferD->setupStorage(getWidth(), getHeight(), GL_RGBA32F, 1);
-    m_gbuffers.bufferD->setSizeFilter(GL_LINEAR, GL_LINEAR);
-
-    panicPossibleGLError();
-
-    m_gbuffers.depthStencilRb.init(GL_DEPTH24_STENCIL8, getWidth(),
-                                   getHeight());
+    m_gbuffers.init(getWidth(), getHeight());
 
     m_gbufferfb.attachTexture(*m_gbuffers.position, GL_COLOR_ATTACHMENT0, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.bufferA, GL_COLOR_ATTACHMENT1, 0);
@@ -243,7 +210,7 @@ void RenderLoo::initGBuffers() {
     m_gbufferfb.attachTexture(*m_gbuffers.bufferC, GL_COLOR_ATTACHMENT3, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.bufferD, GL_COLOR_ATTACHMENT4, 0);
     m_gbufferfb.attachRenderbuffer(m_gbuffers.depthStencilRb,
-                                   GL_DEPTH_ATTACHMENT);
+                                   GL_DEPTH_STENCIL_ATTACHMENT);
 }
 void RenderLoo::initDeferredPass() {
     m_deferredfb.init();
@@ -428,6 +395,22 @@ void RenderLoo::gui() {
                                         ImGuiTreeNodeFlags_DefaultOpen)) {
                 ImGui::Checkbox("Wire frame mode", &m_wireframe);
                 ImGui::Checkbox("Normal mapping", &m_enablenormal);
+                const char* debugOutputItems[7] = {
+                    "None",   "Base Color", "Metalness", "Roughness",
+                    "Normal", "Emission",   "AO"};
+                if (ImGui::TreeNodeEx("Debug Output",
+                                      ImGuiTreeNodeFlags_DefaultOpen)) {
+                    for (int i = 0; i < 7; i++) {
+                        if (ImGui::Selectable(
+                                debugOutputItems[i],
+                                (int)m_debugOutputPass.debugOutputOption ==
+                                    i)) {
+                            m_debugOutputPass.debugOutputOption =
+                                static_cast<DebugOutputOption>(i);
+                        }
+                    }
+                }
+                ImGui::TreePop();
                 const char* antialiasmethod[] = {"None", "SMAA"};
                 ImGui::Combo("Antialias", (int*)(&m_antialiasmethod),
                              antialiasmethod, IM_ARRAYSIZE(antialiasmethod));
@@ -547,10 +530,12 @@ void RenderLoo::gbufferPass() {
     glDepthFunc(GL_GREATER);
     glEnable(GL_STENCIL_TEST);
 
-    glCullFace(GL_BACK);
-    glClearDepth(0.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
     glStencilMask(0xFF);
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    glClearDepth(0.0f);
+    glClearStencil(0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
     m_baseshader.use();
     scene(m_baseshader, RenderFlag_Opaque);
@@ -561,10 +546,12 @@ void RenderLoo::gbufferPass() {
     glDisable(GL_CULL_FACE);
     glDepthFunc(GL_LESS);
     glDisable(GL_DEPTH_TEST);
+
+    glStencilFunc(GL_EQUAL, 1, 0xFF);
+    // disable stencil write
+    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
     endEvent();
 }
-
-void RenderLoo::shadowMapPass() {}
 
 void RenderLoo::deferredPass() {
     beginEvent("Deferred Pass");
@@ -697,14 +684,15 @@ void RenderLoo::loop() {
             endEvent();
         }
 
-        finalScreenPass(texture);
+        if (m_debugOutputPass.debugOutputOption == DebugOutputOption::None)
+            finalScreenPass(texture);
+        else
+            m_debugOutputPass.render(m_gbuffers, m_ssao.getAOTexture());
     }
 
     keyboard();
 
     mouse();
-
-    gui();
 }
 
 void RenderLoo::animation() {

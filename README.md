@@ -5,7 +5,7 @@ This is my OpenGL realtime rendering lab based on [loo](https://github.com/Hyike
 ## Features
 
 - [x] Rendering pipeline
-  - [x] Deferred shading
+  - [x] Deferred shading(Reverse-Z)
   - [ ] Forward+(under construction)
 - [x] Physically based rendering
   - [x] Metallic-roughness workflow(GGX)
@@ -24,7 +24,7 @@ This is my OpenGL realtime rendering lab based on [loo](https://github.com/Hyike
 - [x] Model format support
   - [x] glTF 2.0(strongly recommended, since it enables full PBR support)
   - [x] any other formats supported by Assimp
-- [ ] Anti-aliasing
+- [x] Anti-aliasing
   - [x] SMAA(1x only)
   - [ ] TAA(under construction)
 

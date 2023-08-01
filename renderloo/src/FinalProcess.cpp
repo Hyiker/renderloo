@@ -21,6 +21,7 @@ void FinalProcess::render(const loo::Texture2D& deferredTexture) {
     Framebuffer::bindDefault();
     glClearColor(0, 0, 0, 1);
     glDisable(GL_DEPTH_TEST);
+    glDisable(GL_STENCIL_TEST);
     glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
     // force fill the quad in the final step
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);

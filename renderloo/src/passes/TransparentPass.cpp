@@ -26,6 +26,7 @@ void TransparentPass::render(const Scene& scene, const Skybox& skybox,
     Application::beginEvent("Transparent Pass");
     m_transparentfb.bind();
     glEnable(GL_BLEND);
+    glDisable(GL_STENCIL_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     std::vector<std::pair<Mesh*, float>> meshes;
 

@@ -63,7 +63,10 @@ const loo::Texture2D& SMAA::apply(const loo::Application& app,
     m_fb.bind();
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_STENCIL_TEST);
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glClearStencil(0);
 
     app.beginEvent("SMAA Edge Detection");
     // pass 1: edge detection
@@ -78,6 +81,9 @@ const loo::Texture2D& SMAA::apply(const loo::Application& app,
 
     app.beginEvent("SMAA Blending Weight Calculation");
     // pass 2: blending weight calculation
+    // disable stencil write
+    glStencilFunc(GL_EQUAL, 1, 0xFF);
+    glStencilMask(0x00);
     m_fb.attachTexture(*m_blend, GL_COLOR_ATTACHMENT0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
     m_shaderpass2.use();
