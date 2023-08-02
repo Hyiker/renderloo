@@ -28,8 +28,7 @@ class SMAA {
    public:
     SMAA(int width, int height);
     void init();
-    const loo::Texture2D& apply(const loo::Application& app,
-                                const loo::Texture2D& src);
+    const loo::Texture2D& apply(const loo::Texture2D& src);
 
    private:
     int m_width, m_height;

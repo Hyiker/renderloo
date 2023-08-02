@@ -57,8 +57,7 @@ void SMAA::init() {
 
     m_fb.attachRenderbuffer(m_rb, GL_STENCIL_ATTACHMENT);
 }
-const loo::Texture2D& SMAA::apply(const loo::Application& app,
-                                  const loo::Texture2D& src) {
+const loo::Texture2D& SMAA::apply(const loo::Texture2D& src) {
     glm::vec4 metrics{1.0f / m_width, 1.0f / m_height, m_width, m_height};
     m_fb.bind();
     glDisable(GL_DEPTH_TEST);
@@ -68,7 +67,7 @@ const loo::Texture2D& SMAA::apply(const loo::Application& app,
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClearStencil(0);
 
-    app.beginEvent("SMAA Edge Detection");
+    Application::beginEvent("SMAA Edge Detection");
     // pass 1: edge detection
     m_fb.attachTexture(*m_edges, GL_COLOR_ATTACHMENT0, 0);
     m_fb.enableAttachments({GL_COLOR_ATTACHMENT0});
@@ -77,9 +76,9 @@ const loo::Texture2D& SMAA::apply(const loo::Application& app,
     m_shaderpass1.setUniform("rt_metrics", metrics);
     m_shaderpass1.setTexture(0, src);
     Quad::globalQuad().draw();
-    app.endEvent();
+    Application::endEvent();
 
-    app.beginEvent("SMAA Blending Weight Calculation");
+    Application::beginEvent("SMAA Blending Weight Calculation");
     // pass 2: blending weight calculation
     // disable stencil write
     glStencilFunc(GL_EQUAL, 1, 0xFF);
@@ -92,9 +91,9 @@ const loo::Texture2D& SMAA::apply(const loo::Application& app,
     m_shaderpass2.setTexture(1, *m_area);
     m_shaderpass2.setTexture(2, *m_search);
     Quad::globalQuad().draw();
-    app.endEvent();
+    Application::endEvent();
 
-    app.beginEvent("SMAA Neighborhood Blending");
+    Application::beginEvent("SMAA Neighborhood Blending");
     // pass 3: neighborhood blending
     m_fb.attachTexture(*m_output, GL_COLOR_ATTACHMENT0, 0);
     // disable stencil test
@@ -104,7 +103,7 @@ const loo::Texture2D& SMAA::apply(const loo::Application& app,
     m_shaderpass3.setTexture(0, src);
     m_shaderpass3.setTexture(1, *m_blend);
     Quad::globalQuad().draw();
-    app.endEvent();
+    Application::endEvent();
 
     m_fb.unbind();
     glEnable(GL_DEPTH_TEST);

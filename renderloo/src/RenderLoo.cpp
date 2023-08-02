@@ -416,7 +416,7 @@ void RenderLoo::gui() {
                     }
                 }
                 ImGui::TreePop();
-                const char* antialiasmethod[] = {"None", "SMAA"};
+                const char* antialiasmethod[] = {"None", "SMAA", "TAA"};
                 ImGui::Combo("Antialias", (int*)(&m_antialiasmethod),
                              antialiasmethod, IM_ARRAYSIZE(antialiasmethod));
                 const char* ambientocclusionmethod[] = {"None", "SSAO", "GTAO"};
@@ -605,6 +605,15 @@ void RenderLoo::aoPass() {
         m_gtao.render(*m_gbuffers.position, *m_gbuffers.bufferC,
                       *m_gbuffers.bufferA, *m_gbuffers.depthStencil);
 }
+const loo::Texture2D& RenderLoo::smaaPass(const loo::Texture2D& input) {
+    if (m_antialiasmethod == AntiAliasMethod::SMAA) {
+        beginEvent("SMAA Pass");
+        const Texture2D& texture = m_smaa.apply(input);
+        endEvent();
+        return texture;
+    }
+    return input;
+}
 
 void RenderLoo::scene(loo::ShaderProgram& shader, RenderFlag flag) {
     shader.use();
@@ -686,15 +695,7 @@ void RenderLoo::loop() {
         if (m_enableBloom)
             m_bloomPass.render(*m_deferredResult);
 
-        if (m_antialiasmethod == AntiAliasMethod::SMAA) {
-            beginEvent("SMAA Pass");
-        }
-        const Texture2D& texture = m_antialiasmethod == AntiAliasMethod::None
-                                       ? *m_deferredResult
-                                       : m_smaa.apply(*this, *m_deferredResult);
-        if (m_antialiasmethod == AntiAliasMethod::SMAA) {
-            endEvent();
-        }
+        const Texture2D& texture = smaaPass(*m_deferredResult);
 
         if (m_debugOutputPass.debugOutputOption == DebugOutputOption::None)
             finalScreenPass(texture);
