@@ -8,7 +8,7 @@
 #include "shaders/shadowmapTransparent.frag.hpp"
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/string_cast.hpp>
-static constexpr int DIRECTIONAL_SHADOW_MAP_SIZE = 2048;
+static constexpr int DIRECTIONAL_SHADOW_MAP_SIZE = 1024;
 using namespace loo;
 
 ShadowMapPass::ShadowMapPass()
