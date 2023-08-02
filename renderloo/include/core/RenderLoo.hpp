@@ -62,6 +62,18 @@ class RenderLoo : public loo::Application {
     void gbufferPass();
     // third pass: deferred pass(illumination)
     void deferredPass();
+    void aoPass();
+
+    const loo::Texture2D& getAOTexture() const {
+        switch (m_aomethod) {
+            case AOMethod::SSAO:
+                return m_ssao.getAOTexture();
+            case AOMethod::GTAO:
+                return m_gtao.getAOTexture();
+            default:
+                return loo::Texture2D::getWhiteTexture();
+        }
+    }
 
     // seventh pass: merge all effects
     void finalScreenPass(const loo::Texture2D& texture);
@@ -86,6 +98,7 @@ class RenderLoo : public loo::Application {
     // ambient occlusion
     AOMethod m_aomethod{AOMethod::SSAO};
     SSAO m_ssao;
+    GTAO m_gtao;
     // deferred pass
     loo::ShaderProgram m_deferredshader;
     loo::Framebuffer m_deferredfb;

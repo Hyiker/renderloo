@@ -5,7 +5,6 @@
 #include <loo/Shader.hpp>
 #include <loo/Texture.hpp>
 #include <memory>
-constexpr int SSAO_KERNEL_SIZE = 64;
 class SSAO {
 
    public:
@@ -19,19 +18,9 @@ class SSAO {
     float bias = 0.0001f, radius = 0.5f;
 
    private:
-    void initRandomTexture();
-    void initKernel();
-
     int m_width, m_height;
     loo::Framebuffer m_fb;
-    // random sample kernel, only used in this shader, no need to use uniform buffer
-    struct Kernel {
-        glm::vec3 samples[SSAO_KERNEL_SIZE]{};
-    } m_kernel;
     loo::ShaderProgram m_ssaoPass1Shader, m_ssaoPass2Shader;
-    // , m_blurShader;
-    // noise texture for random tangent vectors
-    std::unique_ptr<loo::Texture2D> m_noise;
     std::unique_ptr<loo::Texture2D> m_blurSource;
     std::unique_ptr<loo::Texture2D> m_result;
 };

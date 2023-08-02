@@ -171,6 +171,7 @@ RenderLoo::RenderLoo(int width, int height)
     initGBuffers();
     m_shadowMapPass.init();
     m_ssao.init();
+    m_gtao.init(getWidth(), getHeight());
     initDeferredPass();
     m_transparentPass.init(*m_gbuffers.depthStencil, *m_deferredResult);
     m_bloomPass.init(getWidth(), getHeight());
@@ -576,10 +577,7 @@ void RenderLoo::deferredPass() {
     m_deferredshader.setTexture(6, m_skybox.getDiffuseConv());
     m_deferredshader.setTexture(7, m_skybox.getSpecularConv());
     m_deferredshader.setTexture(8, m_skybox.getBRDFLUT());
-    const loo::Texture2D& aoTex = m_aomethod == AOMethod::SSAO
-                                      ? m_ssao.getAOTexture()
-                                      : Texture2D::getWhiteTexture();
-    m_deferredshader.setTexture(9, aoTex);
+    m_deferredshader.setTexture(9, getAOTexture());
 
     m_deferredshader.setUniform("cameraPosition", m_mainCamera->position);
     m_deferredshader.setUniform("enableCompensation", m_enableDFGCompensation);
@@ -597,6 +595,15 @@ void RenderLoo::deferredPass() {
     glEnable(GL_DEPTH_TEST);
 
     endEvent();
+}
+
+void RenderLoo::aoPass() {
+    if (m_aomethod == AOMethod::SSAO)
+        m_ssao.render(*this, *m_gbuffers.position, *m_gbuffers.bufferC,
+                      *m_gbuffers.depthStencil);
+    else if (m_aomethod == AOMethod::GTAO)
+        m_gtao.render(*m_gbuffers.position, *m_gbuffers.bufferC,
+                      *m_gbuffers.bufferA, *m_gbuffers.depthStencil);
 }
 
 void RenderLoo::scene(loo::ShaderProgram& shader, RenderFlag flag) {
@@ -667,9 +674,7 @@ void RenderLoo::loop() {
         m_shadowMapPass.render(m_scene, m_lights,
                                m_transparentPass.getAlphaTestThreshold());
 
-        if (m_aomethod == AOMethod::SSAO)
-            m_ssao.render(*this, *m_gbuffers.position, *m_gbuffers.bufferC,
-                          *m_gbuffers.depthStencil);
+        aoPass();
 
         deferredPass();
 
@@ -694,7 +699,7 @@ void RenderLoo::loop() {
         if (m_debugOutputPass.debugOutputOption == DebugOutputOption::None)
             finalScreenPass(texture);
         else
-            m_debugOutputPass.render(m_gbuffers, m_ssao.getAOTexture());
+            m_debugOutputPass.render(m_gbuffers, getAOTexture());
     }
 
     keyboard();

@@ -3,6 +3,7 @@
 #include <loo/Shader.hpp>
 #include <memory>
 #include <random>
+#include "ao/AOHelper.hpp"
 #include "shaders/SSAOPass1.frag.hpp"
 #include "shaders/SSAOPass2.frag.hpp"
 #include "shaders/finalScreen.vert.hpp"
@@ -16,6 +17,8 @@ SSAO::SSAO(int width, int height)
                         Shader(SSAOPASS2_FRAG, ShaderType::Fragment)} {}
 
 void SSAO::init() {
+    initAO();
+
     m_fb.init();
     m_result = std::make_unique<loo::Texture2D>();
     m_result->init();
@@ -28,9 +31,6 @@ void SSAO::init() {
     m_blurSource->setupStorage(m_width, m_height, GL_R8, 1);
     m_blurSource->setSizeFilter(GL_LINEAR, GL_LINEAR);
     m_blurSource->setWrapFilter(GL_CLAMP_TO_EDGE);
-
-    initKernel();
-    initRandomTexture();
 }
 
 void SSAO::render(const loo::Application& app, const Texture2D& position,
@@ -50,16 +50,17 @@ void SSAO::render(const loo::Application& app, const Texture2D& position,
     glStencilMask(0x00);
 
     m_ssaoPass1Shader.use();
-    for (int i = 0; i < SSAO_KERNEL_SIZE; ++i) {
+    const auto& aoKernel = getAOKernel();
+    for (int i = 0; i < AO_KERNEL_SIZE; ++i) {
         m_ssaoPass1Shader.setUniform("kernelSamples[" + std::to_string(i) + "]",
-                                     m_kernel.samples[i]);
+                                     aoKernel[i]);
     }
     m_ssaoPass1Shader.setUniform("framebufferSize",
                                  glm::vec2(m_width, m_height));
     m_ssaoPass1Shader.setTexture(0, position);
     m_ssaoPass1Shader.setTexture(1, normal);
     m_ssaoPass1Shader.setTexture(2, depthStencil);
-    m_ssaoPass1Shader.setTexture(3, *m_noise);
+    m_ssaoPass1Shader.setTexture(3, getAONoiseTexture());
     m_ssaoPass1Shader.setUniform("bias", bias);
     m_ssaoPass1Shader.setUniform("radius", radius);
     Quad::globalQuad().draw();
@@ -79,37 +80,4 @@ void SSAO::render(const loo::Application& app, const Texture2D& position,
     // enable stencil write
     glStencilMask(0xFF);
     app.endEvent();
-}
-
-void SSAO::initKernel() {
-    std::uniform_real_distribution<float> randomFloats(0.0, 1.0);
-    std::default_random_engine generator;
-    for (int i = 0; i < SSAO_KERNEL_SIZE; ++i) {
-        glm::vec3 sample(randomFloats(generator) * 2.0 - 1.0,
-                         randomFloats(generator) * 2.0 - 1.0,
-                         randomFloats(generator));
-        sample = glm::normalize(sample);
-        sample *= randomFloats(generator);
-        float scale = float(i) / SSAO_KERNEL_SIZE;
-        scale = glm::mix(0.1f, 1.0f, scale * scale);
-        m_kernel.samples[i] = sample * scale;
-    }
-}
-
-constexpr int NOISE_SIZE = 4;
-void SSAO::initRandomTexture() {
-    std::uniform_real_distribution<float> randomFloats(-1.0, 1.0);
-    std::default_random_engine generator;
-    std::vector<glm::vec3> ssaoNoise;
-    for (int i = 0; i < NOISE_SIZE * NOISE_SIZE; i++) {
-        glm::vec3 noise(randomFloats(generator), randomFloats(generator), 0.0f);
-        noise = glm::normalize(noise);
-        ssaoNoise.push_back(noise);
-    }
-    m_noise = std::make_unique<loo::Texture2D>();
-    m_noise->init();
-    m_noise->setup(ssaoNoise.data(), NOISE_SIZE, NOISE_SIZE, GL_RGB16F, GL_RGB,
-                   GL_FLOAT, 1);
-    m_noise->setSizeFilter(GL_NEAREST, GL_NEAREST);
-    m_noise->setWrapFilter(GL_REPEAT);
 }

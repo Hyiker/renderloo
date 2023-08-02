@@ -1,5 +1,6 @@
 #ifndef RENDERLOO_INCLUDE_AO_AO_HPP
 #define RENDERLOO_INCLUDE_AO_AO_HPP
+#include "GTAO.hpp"
 #include "SSAO.hpp"
 enum class AOMethod : int {
     None = 0,

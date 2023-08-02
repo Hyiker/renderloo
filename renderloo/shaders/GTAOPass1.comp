@@ -1,0 +1,184 @@
+#version 460 core
+#extension GL_GOOGLE_include_directive : enable
+#include "include/camera.glsl"
+#include "include/math.glsl"
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+// use regular sampler to enable linear filtering
+layout(binding = 0) uniform sampler2D GBufferPosition;
+layout(binding = 1) uniform sampler2D GBufferNormal;
+layout(binding = 2) uniform sampler2D GBufferDepth;
+layout(binding = 3) uniform sampler2D GBufferAlbedo;
+
+layout(std140, binding = 0) uniform MVPMatrices {
+    mat4 model;
+    mat4 view;
+    mat4 projection;
+    mat4 normalMatrix;
+};
+
+layout(r16f, binding = 4) uniform image2D OutputImage;
+
+uniform vec2 SinAndCosDeltaAngle;
+uniform int NumSlices;
+
+// from UE4 source
+// https://blog.csdn.net/u010669231/article/details/116333543
+float InterleavedGradientNoise(vec2 iPos) {
+    return fract(52.9829189f *
+                 fract((iPos.x * 0.06711056) + (iPos.y * 0.00583715)));
+}
+
+vec2 GetRandomAngleOffset(uvec2 iPos) {
+    iPos.y = 4096 - iPos.y;
+    float Angle = InterleavedGradientNoise(vec2(iPos));
+    float Offset = (1.0 / 4.0) * ((iPos.y - iPos.x) & 3);
+    return vec2(Angle, Offset);
+}
+vec3 GetRandomVector(uvec2 iPos) {
+    iPos.y = 16384 - iPos.y;
+
+    vec3 RandomVec = vec3(0, 0, 0);
+    vec3 RandomTexVec = vec3(0, 0, 0);
+    float ScaleOffset;
+
+    float TemporalCos = 0.705;
+    float TemporalSin = 0.705;
+    float GradientNoise = InterleavedGradientNoise(vec2(iPos));  // [0, 1]
+
+    RandomTexVec.x = cos((GradientNoise * PI));  // [-1, 1]
+    RandomTexVec.y = sin((GradientNoise * PI));  // [0, 1]
+
+    ScaleOffset = (1.0 / 4.0) * ((iPos.y - iPos.x) & 3);
+    //	ScaleOffset = (1.0/5.0)  *  (( iPos.y - iPos.x) % 5);
+
+    RandomVec.x = dot(RandomTexVec.xy,
+                      vec2(TemporalCos, -TemporalSin));  // [-1.41, 0.705]
+    RandomVec.y =
+        dot(RandomTexVec.xy, vec2(TemporalSin, TemporalCos));  // [-0.705, 1.41]
+    RandomVec.z = fract(ScaleOffset + 0.705);
+
+    return RandomVec;
+}
+
+vec2 searchForLargestAngleDual(vec2 uv, vec2 sampleDir, float offset,
+                               vec3 positionVS, vec3 viewDirVS) {
+    const int GTAO_NUMTAPS = 8;
+    vec2 sceneDepths;
+    vec2 bestAngles = vec2(-1, -1);
+    const float WorldRadius = 30.0f;
+    float AttenFactor = 2.0 / (WorldRadius * WorldRadius);
+    float falloff;
+    float Thickness = 0.9f;
+    for (int i = 0; i < GTAO_NUMTAPS; i++) {
+        float fi = float(i);
+        vec2 uvOffset = sampleDir * max(fi * offset, (fi + 1.0));
+        uvOffset.y *= -1.0;
+        // offseted sampling uv
+        vec4 uv2 = uv.xyxy + vec4(uvOffset, -uvOffset);
+
+        // positive direction sampling
+        vec3 V = (view * vec4(texture(GBufferPosition, uv2.xy).xyz, 1.0)).xyz -
+                 positionVS;
+        float lenSq = dot(V, V);
+        float ooLen = 1.0 / sqrt(lenSq + 0.0001);
+        float ang = dot(V, viewDirVS) * ooLen;
+
+        falloff = clamp(lenSq * AttenFactor, 0.0, 1.0);
+        ang = mix(ang, bestAngles.x, falloff);
+        bestAngles.x =
+            ang > bestAngles.x ? ang : mix(ang, bestAngles.x, Thickness);
+
+        // negative direction sampling
+        V = (view * vec4(texture(GBufferPosition, uv2.zw).xyz, 1.0)).xyz -
+            positionVS;
+        lenSq = dot(V, V);
+        ooLen = 1.0 / sqrt(lenSq + 0.0001);
+        ang = dot(V, viewDirVS) * ooLen;
+
+        falloff = clamp(lenSq * AttenFactor, 0.0, 1.0);
+        ang = mix(ang, bestAngles.y, falloff);
+        bestAngles.y =
+            ang > bestAngles.y ? ang : mix(ang, bestAngles.y, Thickness);
+    }
+    bestAngles.x = acos(clamp(bestAngles.x, -1.0, 1.0));
+    bestAngles.y = acos(clamp(bestAngles.y, -1.0, 1.0));
+    return bestAngles;
+}
+#define PI_HALF 1.57079632679
+float computeInnerIntegral(vec2 bestAngles, vec2 screenDir, vec3 viewDir,
+                           vec3 normalVS) {
+    vec3 planeNormal = normalize(cross(vec3(screenDir, 0.0), viewDir));
+    vec3 perp = cross(viewDir, planeNormal);
+    vec3 projNormal = normalVS - planeNormal * dot(normalVS, planeNormal);
+
+    float LenProjNormal = length(projNormal) + 0.000001f;
+    float RecipMag = 1.0f / (LenProjNormal);
+
+    float CosAng = dot(projNormal, perp) * RecipMag;
+    // n
+    float Gamma = acos(CosAng) - PI_HALF;
+    float CosGamma = dot(projNormal, viewDir) * RecipMag;
+    float SinGamma = CosAng * -2.0f;
+
+    // clamp to normal hemisphere
+    bestAngles.x = Gamma + max(-bestAngles.x - Gamma, -PI_HALF);
+    bestAngles.y = Gamma + min(bestAngles.y - Gamma, PI_HALF);
+
+    float AO = (LenProjNormal * 0.25 *
+                ((bestAngles.x * SinGamma + CosGamma -
+                  cos((2.0 * bestAngles.x) - Gamma)) +
+                 (bestAngles.y * SinGamma + CosGamma -
+                  cos((2.0 * bestAngles.y) - Gamma))));
+
+    return AO;
+}
+vec3 MutiBounce(float x, vec3 albedo) {
+    vec3 a = 2.0404 * albedo - 0.3324;
+    vec3 b = -4.7951 * albedo + 0.6417;
+    vec3 c = 2.7552 * albedo + 0.6903;
+
+    return max(vec3(x), ((x * a + b) * x + c) * x);
+}
+void main() {
+    ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
+    vec2 texelSize = 1.0 / vec2(textureSize(GBufferPosition, 0));
+    vec2 uv = vec2(pixelCoords) / vec2(imageSize(OutputImage));
+    vec3 randomVec = GetRandomVector(pixelCoords);
+    float offset = randomVec.z;
+    vec2 screenDir = randomVec.xy;
+
+    vec3 positionVS = (view * vec4(texture(GBufferPosition, uv).xyz, 1.0)).xyz;
+    vec3 viewDirVS = normalize(-positionVS.xyz);
+    vec3 normalWS = texture(GBufferNormal, uv).xyz;
+    if (normalWS.x == 0 && normalWS.y == 0 && normalWS.z == 0) {
+        imageStore(OutputImage, pixelCoords, vec4(0.0, 0.0, 0.0, 1.0));
+        return;
+    }
+    vec3 normalVS = (view * vec4(normalWS, 0.0)).xyz;
+
+    vec2 cameraZParams = extractZParamFromProjection(projection);
+    float depthLinear = texture(GBufferDepth, uv).x;
+    depthLinear = linear01Depth(depthLinear, cameraZParams.x, cameraZParams.y);
+
+    const float sinDeltaAngle = SinAndCosDeltaAngle.x;
+    const float cosDeltaAngle = SinAndCosDeltaAngle.y;
+    float sum = 0.0;
+    for (int angle = 0; angle < NumSlices; angle++) {
+        vec2 angles = searchForLargestAngleDual(uv, screenDir * texelSize,
+                                                offset, positionVS, viewDirVS);
+
+        sum += computeInnerIntegral(angles, screenDir, viewDirVS, normalVS);
+
+        vec2 screenDirTmp = screenDir;
+        screenDir.x +=
+            screenDirTmp.x * cosDeltaAngle - screenDirTmp.y * sinDeltaAngle;
+        screenDir.y +=
+            screenDirTmp.x * sinDeltaAngle + screenDirTmp.y * cosDeltaAngle;
+        offset += fract(offset + 0.617);
+    }
+    sum = sum / float(NumSlices);
+    sum *= 2.0 / PI;
+    sum = length(MutiBounce(sum, texture(GBufferAlbedo, uv).rgb));
+
+    imageStore(OutputImage, pixelCoords, vec4(sum));
+}
