@@ -1,0 +1,37 @@
+#version 460 core
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2D DownSampledImage;
+layout(binding = 1) uniform sampler2D PreviousUpSampleImage;
+layout(rgba32f, binding = 2) uniform image2D OutputImage;
+uniform int level;
+const float GAUSSIAN_KERNEL[] =
+    float[](0.06136, 0.24477, 0.38774, 0.24477, 0.06136);
+
+void main() {
+    // size(DownSampledImage) == size(OutputImage) == 2xsize(PreviousUpSampleImage)
+    ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
+    vec2 uv = vec2(pixelCoords) / vec2(imageSize(OutputImage));
+    vec2 downSampleTexelSize = 1.0 / vec2(textureSize(DownSampledImage, level));
+    vec2 previousUpSampleTexelSize =
+        1.0 / vec2(textureSize(PreviousUpSampleImage, level + 1));
+    float weightSum = 0.0;
+    vec3 colorSum = vec3(0.0);
+    for (int i = -2; i <= 2; i++) {
+        for (int j = -2; j <= 2; j++) {
+            vec2 offset = vec2(i, j);
+            vec3 downSampleColor =
+                textureLod(DownSampledImage, uv + offset * downSampleTexelSize,
+                           level)
+                    .rgb;
+            vec3 previousUpSampleColor =
+                textureLod(PreviousUpSampleImage,
+                           uv + offset * previousUpSampleTexelSize, level + 1)
+                    .rgb;
+            float weight = GAUSSIAN_KERNEL[i + 2] * GAUSSIAN_KERNEL[j + 2];
+            weightSum += weight;
+            colorSum += weight * (downSampleColor + previousUpSampleColor);
+        }
+    }
+    imageStore(OutputImage, pixelCoords, vec4(colorSum / weightSum, 1.0));
+}

@@ -11,15 +11,14 @@ class BloomPass {
    public:
     BloomPass();
     void init(int width, int height);
-    void render(const loo::Texture2D& inout, const loo::Texture2D& GBufferD);
+    void render(const loo::Texture2D& inout);
     float brightnessThreshold = 1.0f;
 
    private:
-    int m_width, m_height, m_mipLevel;
-    loo::Framebuffer m_fb;
-    loo::ComputeShader m_pixelPicker, m_chainedGaussianBlur;
-    loo::ShaderProgram m_additiveBlending;
-    std::unique_ptr<loo::Texture2D> m_pickedPixel;
+    int m_width, m_height, m_mipLevelDownSample;
+    loo::ComputeShader m_pixelPickerShader, m_downSamplingShader,
+        m_upSamplingShader, m_additiveBlendingShader;
+    std::unique_ptr<loo::Texture2D> m_downSample, m_upSample;
 };
 
 #endif /* RENDERLOO_INCLUDE_PASSES_BLOOM_PASS_HPP */

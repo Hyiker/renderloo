@@ -398,6 +398,7 @@ void RenderLoo::gui() {
                 ImGui::Checkbox("Normal mapping", &m_enablenormal);
                 ImGui::Checkbox("Enable DFG Compensation",
                                 &m_enableDFGCompensation);
+                ImGui::Checkbox("Bloom", &m_enableBloom);
                 const char* debugOutputItems[7] = {
                     "None",   "Base Color", "Metalness", "Roughness",
                     "Normal", "Emission",   "AO"};
@@ -677,8 +678,8 @@ void RenderLoo::loop() {
         m_transparentPass.render(m_scene, m_skybox, *m_mainCamera,
                                  m_shadowMapPass.getDirectionalShadowMap(),
                                  m_enableDFGCompensation);
-
-        m_bloomPass.render(*m_deferredResult, *m_gbuffers.bufferD);
+        if (m_enableBloom)
+            m_bloomPass.render(*m_deferredResult);
 
         if (m_antialiasmethod == AntiAliasMethod::SMAA) {
             beginEvent("SMAA Pass");

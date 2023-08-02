@@ -30,7 +30,6 @@
 #include "passes/BloomPass.hpp"
 #include "passes/DebugOutputPass.hpp"
 
-
 enum RenderFlag {
     RenderFlag_Opaque = 1 << 0,
     RenderFlag_Transparent = 1 << 1,
@@ -108,6 +107,7 @@ class RenderLoo : public loo::Application {
     bool m_enablenormal{true};
     bool m_screenshotflag{false};
     bool m_enableDFGCompensation{true};
+    bool m_enableBloom{true};
 
     FinalPassOptions m_finalpassoptions;
 
