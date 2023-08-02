@@ -33,7 +33,7 @@ This is my OpenGL realtime rendering lab based on [loo](https://github.com/Hyike
 - [x] Post-processing
   - [x] SSAO
     - [x] Original
-    - [ ] GTAO
+    - [X] GTAO(partially done, lack correction and optimization)
   - [x] Physically based blooming
 
 ## Gallery
