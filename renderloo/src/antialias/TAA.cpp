@@ -15,20 +15,20 @@ void TAA::init(int width, int height) {
     m_historyFrame[1]->setupStorage(width, height, GL_RGBA32F, 1);
     m_historyFrame[1]->setSizeFilter(GL_LINEAR, GL_LINEAR);
     m_historyFrame[1]->setWrapFilter(GL_CLAMP_TO_EDGE);
-
-    m_debugTexture = std::make_unique<Texture2D>();
-    m_debugTexture->init();
-    m_debugTexture->setupStorage(width, height, GL_RGBA32F, 1);
-    m_debugTexture->setSizeFilter(GL_LINEAR, GL_LINEAR);
-    m_debugTexture->setWrapFilter(GL_CLAMP_TO_EDGE);
 }
 constexpr int GROUP_SIZE = 32;
-const Texture2D& TAA::apply(const Texture2D& currentFrame,
-                            const Texture2D& velocity,
-                            const Texture2D& depthStencil) {
+const Texture2D& TAA::apply(Texture2D& currentFrame, Texture2D& velocity,
+                            Texture2D& depthStencil) {
     Application::beginEvent("TAA");
 
     m_blendingShader.use();
+    // use nearest sampler for current frame, depth and velocity to avoid blur due to blending
+    currentFrame.setSizeFilter(GL_NEAREST, GL_NEAREST);
+    depthStencil.setSizeFilter(GL_NEAREST, GL_NEAREST);
+    velocity.setSizeFilter(GL_NEAREST, GL_NEAREST);
+    // use linear sampler for history frame to avoid aliasing
+    m_historyFrame[getPreviousFrameIndex()]->setSizeFilter(GL_LINEAR,
+                                                           GL_LINEAR);
     m_blendingShader.setRegularTexture(0, currentFrame);
     m_blendingShader.setRegularTexture(
         1, *m_historyFrame[getPreviousFrameIndex()]);
@@ -44,5 +44,9 @@ const Texture2D& TAA::apply(const Texture2D& currentFrame,
     m_blendingShader.wait();
     Application::endEvent();
     m_writeInIndex = getPreviousFrameIndex();
+    // reset sampler to linear
+    currentFrame.setSizeFilter(GL_LINEAR, GL_LINEAR);
+    depthStencil.setSizeFilter(GL_LINEAR, GL_LINEAR);
+    velocity.setSizeFilter(GL_LINEAR, GL_LINEAR);
     return *m_historyFrame[m_writeInIndex ^ 1];
 }

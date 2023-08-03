@@ -637,7 +637,7 @@ const loo::Texture2D& RenderLoo::smaaPass(const loo::Texture2D& input) {
     return input;
 }
 
-const loo::Texture2D& RenderLoo::taaPass(const loo::Texture2D& input) {
+const loo::Texture2D& RenderLoo::taaPass(loo::Texture2D& input) {
     if (m_antialiasmethod == AntiAliasMethod::TAA) {
         return m_taa.apply(input, *m_velocityTexture, *m_gbuffers.depthStencil);
     }

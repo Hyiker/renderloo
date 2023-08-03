@@ -17,14 +17,14 @@ class TAA {
    public:
     TAA();
     void init(int width, int height);
-    const loo::Texture2D& apply(const loo::Texture2D& currentFrame,
-                                const loo::Texture2D& velocity,
-                                const loo::Texture2D& depthStencil);
+    const loo::Texture2D& apply(loo::Texture2D& currentFrame,
+                                loo::Texture2D& velocity,
+                                loo::Texture2D& depthStencil);
     int getPreviousFrameIndex() const { return m_writeInIndex ^ 1; }
 
    private:
-    std::unique_ptr<loo::Texture2D> m_historyFrame[2],  // ping-pong
-        m_debugTexture;
+    std::unique_ptr<loo::Texture2D> m_historyFrame[2];  // ping-pong
+
     int m_writeInIndex = 0;
     loo::ComputeShader m_blendingShader;
 };

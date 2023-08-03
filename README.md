@@ -29,7 +29,7 @@ This is my OpenGL realtime rendering lab based on [loo](https://github.com/Hyike
   - [x] any other formats supported by Assimp
 - [x] Anti-aliasing
   - [x] SMAA(1x only)
-  - [ ] TAA(under construction)
+  - [x] TAA(8x)
 - [x] Post-processing
   - [x] SSAO
     - [x] Original

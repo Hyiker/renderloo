@@ -71,7 +71,7 @@ class RenderLoo : public loo::Application {
     void deferredPass();
     void aoPass();
     const loo::Texture2D& smaaPass(const loo::Texture2D& input);
-    const loo::Texture2D& taaPass(const loo::Texture2D& input);
+    const loo::Texture2D& taaPass(loo::Texture2D& input);
 
     const loo::Texture2D& getAOTexture() const {
         switch (m_aomethod) {

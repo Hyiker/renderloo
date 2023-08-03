@@ -76,7 +76,7 @@ void main() {
     mat4 jitteredProjection = projection;
     if (_RenderInfo.enableTAA != 0) {
         vec2 jitter = Halton_2_3[_RenderInfo.frameCount % 8] /
-                      vec2(_RenderInfo.deviceSize);
+                      vec2(_RenderInfo.deviceSize) * 0.75;
         jitteredProjection[2][0] += jitter.x;
         jitteredProjection[2][1] += jitter.y;
     }
