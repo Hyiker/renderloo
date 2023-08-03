@@ -32,4 +32,8 @@ constexpr int SHADER_BINDING_PORT_MR_EMISSIVE = 14;
 // directional shadow matrices binding
 constexpr int SHADER_UB_PORT_DIRECTIONAL_SHADOW_MATRICES = 4;
 
+// previous frame mvp
+constexpr int SHADER_UB_PORT_PREVIOUS_FRAME_MVP = 5;
+constexpr int SHADER_UB_PORT_RENDER_INFO = 6;
+
 #endif /* HDSSS_INCLUDE_CONSTANTS_HPP */

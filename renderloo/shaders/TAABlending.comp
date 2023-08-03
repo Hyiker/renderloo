@@ -1,0 +1,141 @@
+#version 460 core
+#extension GL_GOOGLE_include_directive : enable
+#include "include/renderInfo.glsl"
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+#pragma optionNV(unroll all)
+// save the blending result in both the current frame and the previous frame
+layout(binding = 0) uniform sampler2D CurrentFrameImage;
+layout(binding = 1) uniform sampler2D PreviousFrameImage;
+layout(binding = 2) uniform sampler2D CurrentDepthTexture;
+layout(binding = 3) uniform sampler2D VelocityTexture;
+layout(rgba32f, binding = 4) uniform image2D OutputImage;
+layout(rgba32f, binding = 5) uniform image2D DebugImage;
+
+#define REVERSE_Z
+vec2 findVelocity(vec2 uv, vec2 texelSizeInv) {
+    vec2 vol = vec2(0.0);
+    float closestDepth =
+#ifdef REVERSE_Z
+        0.0;
+#else
+        1.0;
+#endif
+    for (int i = -1; i <= 1; i++) {
+        for (int j = -1; j <= 1; j++) {
+            vec2 offset = vec2(i, j) * texelSizeInv;
+            vec2 uvOffset = uv + offset;
+            float depth = textureLod(CurrentDepthTexture, uv, 0).r;
+            if (
+#ifdef REVERSE_Z
+                depth > closestDepth
+#else
+                depth < closestDepth
+#endif
+            ) {
+                closestDepth = depth;
+                vol = textureLod(VelocityTexture, uv, 0).rg;
+            }
+        }
+    }
+    return vol;
+}
+
+vec3 RGB2YCoCgR(vec3 rgbColor) {
+    vec3 YCoCgRColor;
+
+    YCoCgRColor.y = rgbColor.r - rgbColor.b;
+    float temp = rgbColor.b + YCoCgRColor.y / 2;
+    YCoCgRColor.z = rgbColor.g - temp;
+    YCoCgRColor.x = temp + YCoCgRColor.z / 2;
+
+    return YCoCgRColor;
+}
+
+vec3 YCoCgR2RGB(vec3 YCoCgRColor) {
+    vec3 rgbColor;
+
+    float temp = YCoCgRColor.x - YCoCgRColor.z / 2;
+    rgbColor.g = YCoCgRColor.z + temp;
+    rgbColor.b = temp - YCoCgRColor.y / 2;
+    rgbColor.r = rgbColor.b + YCoCgRColor.y;
+
+    return rgbColor;
+}
+// from UE simplified tonemapper
+float Luminance(vec3 color) {
+    return 0.25 * color.r + 0.5 * color.g + 0.25 * color.b;
+}
+
+vec3 ToneMap(vec3 color) {
+    return color / (1 + Luminance(color));
+}
+
+vec3 UnToneMap(vec3 color) {
+    return color / (1 - Luminance(color));
+}
+
+void computeColorVariance(vec2 uv, vec2 texelSizeInv, out vec3 m1,
+                          out vec3 m2) {
+    m1 = vec3(0);
+    m2 = vec3(0);
+    for (int i = -1; i <= 1; i++) {
+        for (int j = -1; j <= 1; j++) {
+            vec3 color = RGB2YCoCgR(ToneMap(
+                texture(CurrentFrameImage, uv + vec2(i, j) * texelSizeInv)
+                    .rgb));
+            m1 += color;
+            m2 += color * color;
+        }
+    }
+}
+
+vec3 varianceClipCurrentColor(vec3 prevColor, vec3 m1, vec3 m2) {
+    const int N = 9;
+    const float VarianceClipGamma = 1.25f;
+    vec3 mu = m1 / N;
+    vec3 sigma = sqrt(abs(m2 / N - mu * mu));
+    vec3 aabbMin = mu - VarianceClipGamma * sigma;
+    vec3 aabbMax = mu + VarianceClipGamma * sigma;
+
+    // clip to center
+    vec3 p_clip = 0.5 * (aabbMax + aabbMin);
+    vec3 e_clip = 0.5 * (aabbMax - aabbMin);
+
+    vec3 v_clip = prevColor - p_clip;
+    vec3 v_unit = v_clip.xyz / e_clip;
+    vec3 a_unit = abs(v_unit);
+    float ma_unit = max(a_unit.x, max(a_unit.y, a_unit.z));
+
+    vec3 result = prevColor;
+    if (ma_unit > 1.0)
+        result = p_clip + v_clip / ma_unit;
+    return result;
+}
+
+void main() {
+    // size(DownSampledImage) == size(OutputImage) == 2xsize(PreviousUpSampleImage)
+    ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
+    if (pixelCoords.x >= _RenderInfo.deviceSize.x ||
+        pixelCoords.y >= _RenderInfo.deviceSize.y)
+        return;
+    vec2 texelSizeInv = 1.0 / textureSize(CurrentFrameImage, 0);
+    vec2 uv = vec2(pixelCoords + 0.5) * texelSizeInv;
+    vec2 velocity = findVelocity(uv, texelSizeInv);
+    vec3 currentColor = RGB2YCoCgR(ToneMap(texture(CurrentFrameImage, uv).rgb));
+    vec2 prevUV = uv + velocity;
+    vec3 previousColor =
+        RGB2YCoCgR(ToneMap(texture(PreviousFrameImage, prevUV).rgb));
+
+    // compute the variance aabb of current color to clip the history color
+    vec3 m1, m2;
+    computeColorVariance(uv, texelSizeInv, m1, m2);
+    previousColor = varianceClipCurrentColor(previousColor, m1, m2);
+
+    currentColor = UnToneMap(YCoCgR2RGB(currentColor));
+    previousColor = UnToneMap(YCoCgR2RGB(previousColor));
+
+    vec3 blendedColor = _RenderInfo.frameCount == 0
+                            ? currentColor
+                            : mix(previousColor, currentColor, 0.05f);
+    imageStore(OutputImage, pixelCoords, vec4(blendedColor, 1.0));
+}

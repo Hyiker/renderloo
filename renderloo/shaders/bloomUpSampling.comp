@@ -1,5 +1,5 @@
 #version 460 core
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 layout(binding = 0) uniform sampler2D DownSampledImage;
 layout(binding = 1) uniform sampler2D PreviousUpSampleImage;
@@ -11,7 +11,10 @@ const float GAUSSIAN_KERNEL[] =
 void main() {
     // size(DownSampledImage) == size(OutputImage) == 2xsize(PreviousUpSampleImage)
     ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
-    vec2 uv = vec2(pixelCoords) / vec2(imageSize(OutputImage));
+    if (any(greaterThanEqual(pixelCoords, imageSize(OutputImage)))) {
+        return;
+    }
+    vec2 uv = vec2(pixelCoords + 0.5) / vec2(imageSize(OutputImage));
     vec2 downSampleTexelSize = 1.0 / vec2(textureSize(DownSampledImage, level));
     vec2 previousUpSampleTexelSize =
         1.0 / vec2(textureSize(PreviousUpSampleImage, level + 1));

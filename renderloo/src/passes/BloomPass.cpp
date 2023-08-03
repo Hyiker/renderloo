@@ -13,7 +13,7 @@ BloomPass::BloomPass()
       m_additiveBlendingShader{
           Shader(BLOOMADDITIVEBLENDING_COMP, ShaderType::Compute)} {}
 
-constexpr int GROUP_SIZE = 1, MIPMAP_LAYER_MAX = 3;
+constexpr int GROUP_SIZE = 16, MIPMAP_LAYER_MAX = 3;
 void BloomPass::init(int width, int height) {
     // base level starting from 1/2
     width /= 2;
@@ -35,15 +35,21 @@ void BloomPass::init(int width, int height) {
                              std::max(m_mipLevelDownSample - 1, 1));
     m_upSample->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
     m_upSample->setWrapFilter(GL_CLAMP_TO_EDGE);
+
+    m_result = std::make_unique<loo::Texture2D>();
+    m_result->init();
+    m_result->setupStorage(width * 2, height * 2, GL_RGBA32F, 1);
+    m_result->setSizeFilter(GL_LINEAR, GL_LINEAR);
+    m_result->setWrapFilter(GL_CLAMP_TO_EDGE);
 }
 
-void BloomPass::render(const Texture2D& inout) {
+const Texture2D& BloomPass::render(const Texture2D& input) {
     Application::beginEvent("Bloom Pass");
     // pick bright pixels, gaussian blur it into the mipmap level 0
     Application::beginEvent("Bloom Pass 1 - Pixel Picker");
     m_pixelPickerShader.use();
     m_pixelPickerShader.setUniform("brightnessThreshold", brightnessThreshold);
-    m_pixelPickerShader.setRegularTexture(0, inout);
+    m_pixelPickerShader.setRegularTexture(0, input);
     m_pixelPickerShader.setTexture(1, *m_downSample, 0, GL_WRITE_ONLY,
                                    GL_RGBA32F);
 
@@ -93,11 +99,15 @@ void BloomPass::render(const Texture2D& inout) {
 
     Application::beginEvent("Bloom Pass 4 - Additive Blending");
     m_additiveBlendingShader.use();
-    m_additiveBlendingShader.setTexture(1, inout, 0, GL_READ_WRITE, GL_RGBA32F);
-    m_additiveBlendingShader.setRegularTexture(0, *m_upSample);
-    m_additiveBlendingShader.dispatch(inout.getWidth(), inout.getHeight());
+    m_additiveBlendingShader.setRegularTexture(0, input);
+    m_additiveBlendingShader.setRegularTexture(1, *m_upSample);
+    m_additiveBlendingShader.setTexture(2, *m_result, 0, GL_WRITE_ONLY,
+                                        GL_RGBA32F);
+    m_additiveBlendingShader.dispatch(m_result->getWidth() / GROUP_SIZE,
+                                      m_result->getHeight() / GROUP_SIZE);
     m_additiveBlendingShader.wait();
     Application::endEvent();
 
     Application::endEvent();
+    return *m_result;
 }

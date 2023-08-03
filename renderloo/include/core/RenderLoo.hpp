@@ -36,7 +36,13 @@ enum RenderFlag {
     RenderFlag_All = RenderFlag_Opaque | RenderFlag_Transparent
 };
 enum class CameraMode : int { FPS, ArcBall };
-
+struct RenderInfo {
+    glm::ivec2 deviceSize;
+    unsigned int frameCount;
+    float timeSecs;
+    int enableTAA;
+    glm::ivec3 padding;
+};
 class RenderLoo : public loo::Application {
    public:
     RenderLoo(int width, int height);
@@ -52,6 +58,7 @@ class RenderLoo : public loo::Application {
    private:
     void initGBuffers();
     void initDeferredPass();
+    void initVelocity();
 
     void loop() override;
     void animation();
@@ -64,6 +71,7 @@ class RenderLoo : public loo::Application {
     void deferredPass();
     void aoPass();
     const loo::Texture2D& smaaPass(const loo::Texture2D& input);
+    const loo::Texture2D& taaPass(const loo::Texture2D& input);
 
     const loo::Texture2D& getAOTexture() const {
         switch (m_aomethod) {
@@ -109,13 +117,16 @@ class RenderLoo : public loo::Application {
     TransparentPass m_transparentPass;
     BloomPass m_bloomPass;
     // antialias
-    AntiAliasMethod m_antialiasmethod{AntiAliasMethod::SMAA};
+    AntiAliasMethod m_antialiasmethod{AntiAliasMethod::TAA};
     SMAA m_smaa;
+    TAA m_taa;
 
     // process
     FinalProcess m_finalprocess;
     // debug
     DebugOutputPass m_debugOutputPass;
+
+    std::unique_ptr<loo::Texture2D> m_velocityTexture;
 
     bool m_wireframe{false};
     bool m_enablenormal{true};

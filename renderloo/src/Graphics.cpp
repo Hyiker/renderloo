@@ -5,10 +5,15 @@
 #include "core/Transforms.hpp"
 #include "core/constants.hpp"
 void drawMesh(const loo::Mesh& mesh, glm::mat4 transform,
-              const loo::ShaderProgram& sp) {
+              glm::mat4 previousTransform, const loo::ShaderProgram& sp) {
     loo::ShaderProgram::getUniformBlock(SHADER_UB_PORT_MVP)
         .mapBufferScoped<MVP>([&](MVP& mvp) {
             mvp.model = transform * mesh.objectMatrix;
+            mvp.normalMatrix = glm::transpose(glm::inverse(mvp.model));
+        });
+    loo::ShaderProgram::getUniformBlock(SHADER_UB_PORT_PREVIOUS_FRAME_MVP)
+        .mapBufferScoped<MVP>([&](MVP& mvp) {
+            mvp.model = previousTransform * mesh.objectMatrixPrev;
             mvp.normalMatrix = glm::transpose(glm::inverse(mvp.model));
         });
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);

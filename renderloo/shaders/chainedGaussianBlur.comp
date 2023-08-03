@@ -1,5 +1,5 @@
 #version 460 core
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 layout(binding = 0) uniform sampler2D InputImage;
 layout(rgba32f, binding = 1) uniform image2D OutputLevel;
@@ -10,7 +10,10 @@ uniform int mipLevel;
 void main() {
     // dispatch size = OutputLevel size, use uv to sample InputLevel
     ivec2 outputCoord = ivec2(gl_GlobalInvocationID.xy);
-    vec2 uv = gl_GlobalInvocationID.xy / vec2(imageSize(OutputLevel));
+    if (any(greaterThanEqual(outputCoord, imageSize(OutputLevel)))) {
+        return;
+    }
+    vec2 uv = (outputCoord + 0.5) / vec2(imageSize(OutputLevel));
     vec2 inputTexelSize = 1.0 / vec2(textureSize(InputImage, mipLevel));
     vec3 sum = vec3(0.0);
     float weightSum = 0.0;

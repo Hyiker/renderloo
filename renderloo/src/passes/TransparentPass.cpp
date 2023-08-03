@@ -71,7 +71,8 @@ void TransparentPass::render(const Scene& scene, const Skybox& skybox,
             glEnable(GL_CULL_FACE);
             glCullFace(GL_BACK);
         }
-        drawMesh(*mesh, scene.getModelMatrix(), m_transparentShader);
+        drawMesh(*mesh, scene.getModelMatrix(), scene.getPreviousModelMatrix(),
+                 m_transparentShader);
     }
     logPossibleGLError();
 
@@ -89,7 +90,8 @@ void TransparentPass::render(const Scene& scene, const Skybox& skybox,
             glEnable(GL_CULL_FACE);
             glCullFace(GL_BACK);
         }
-        drawMesh(*mesh, scene.getModelMatrix(), m_transparentShader);
+        drawMesh(*mesh, scene.getModelMatrix(), scene.getPreviousModelMatrix(),
+                 m_transparentShader);
     }
     logPossibleGLError();
     Application::endEvent();

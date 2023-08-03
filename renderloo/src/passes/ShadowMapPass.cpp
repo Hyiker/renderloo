@@ -80,7 +80,8 @@ void ShadowMapPass::render(const loo::Scene& scene,
                     glEnable(GL_CULL_FACE);
                     glCullFace(GL_BACK);
                 }
-                drawMesh(*mesh, sceneModelMatrix, m_opaqueShader);
+                drawMesh(*mesh, sceneModelMatrix,
+                         scene.getPreviousModelMatrix(), m_opaqueShader);
             }
             // if we render in solid mode, no need for special treatment of transparency
             if (transparentShadowMode == TransparentShadowMode::Solid)
@@ -100,7 +101,8 @@ void ShadowMapPass::render(const loo::Scene& scene,
                     glEnable(GL_CULL_FACE);
                     glCullFace(GL_BACK);
                 }
-                drawMesh(*mesh, sceneModelMatrix, m_transparentShader);
+                drawMesh(*mesh, sceneModelMatrix,
+                         scene.getPreviousModelMatrix(), m_transparentShader);
             }
         }
     }

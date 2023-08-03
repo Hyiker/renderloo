@@ -148,6 +148,7 @@ void RenderLoo::loadModel(const std::string& filename) {
     sceneAABB = m_scene.computeAABBWorldSpace();
     m_mainCamera = placeCameraBySceneAABB(sceneAABB, m_cameraMode);
     LOG(INFO) << "Load done" << endl;
+    frameCount = 0;
 }
 
 void RenderLoo::loadSkybox(const std::string& filename) {
@@ -168,6 +169,7 @@ RenderLoo::RenderLoo(int width, int height)
 
     PBRMetallicMaterial::init();
 
+    initVelocity();
     initGBuffers();
     m_shadowMapPass.init();
     m_ssao.init();
@@ -176,6 +178,7 @@ RenderLoo::RenderLoo(int width, int height)
     m_transparentPass.init(*m_gbuffers.depthStencil, *m_deferredResult);
     m_bloomPass.init(getWidth(), getHeight());
     m_smaa.init();
+    m_taa.init(getWidth(), getHeight());
 
     // final pass related
     { m_finalprocess.init(); }
@@ -199,6 +202,10 @@ RenderLoo::RenderLoo(int width, int height)
 
     { glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE); }
 
+    // render info setup
+    ShaderProgram::initUniformBlock(std::make_unique<UniformBuffer>(
+        SHADER_UB_PORT_RENDER_INFO, sizeof(RenderInfo)));
+
     NFD_Init();
 }
 void RenderLoo::initGBuffers() {
@@ -211,6 +218,7 @@ void RenderLoo::initGBuffers() {
     m_gbufferfb.attachTexture(*m_gbuffers.bufferB, GL_COLOR_ATTACHMENT2, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.bufferC, GL_COLOR_ATTACHMENT3, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.bufferD, GL_COLOR_ATTACHMENT4, 0);
+    m_gbufferfb.attachTexture(*m_velocityTexture, GL_COLOR_ATTACHMENT5, 0);
     m_gbufferfb.attachTexture(*m_gbuffers.depthStencil,
                               GL_DEPTH_STENCIL_ATTACHMENT, 0);
 }
@@ -224,6 +232,18 @@ void RenderLoo::initDeferredPass() {
     m_deferredfb.attachTexture(*m_deferredResult, GL_COLOR_ATTACHMENT0, 0);
     m_deferredfb.attachTexture(*m_gbuffers.depthStencil, GL_DEPTH_ATTACHMENT,
                                0);
+    panicPossibleGLError();
+}
+
+void RenderLoo::initVelocity() {
+    m_velocityTexture = make_unique<Texture2D>();
+    m_velocityTexture->init();
+    m_velocityTexture->setupStorage(getWidth(), getHeight(), GL_RG16F, 1);
+    m_velocityTexture->setSizeFilter(GL_LINEAR, GL_LINEAR);
+    m_velocityTexture->setWrapFilter(GL_CLAMP_TO_EDGE);
+
+    ShaderProgram::initUniformBlock(std::make_unique<UniformBuffer>(
+        SHADER_UB_PORT_PREVIOUS_FRAME_MVP, sizeof(MVP)));
     panicPossibleGLError();
 }
 
@@ -446,6 +466,7 @@ void RenderLoo::gui() {
                                               m_skybox.loadTexture(outPath);
                                           });
                         resumeTime();
+                        frameCount = 0;
                     }
                     static glm::vec3 skyboxColor = glm::vec3(1.f);
                     ImGui::ColorEdit3("", (float*)&skyboxColor,
@@ -453,6 +474,7 @@ void RenderLoo::gui() {
                     ImGui::SameLine();
                     if (ImGui::Button("Apply")) {
                         m_skybox.loadPureColor(skyboxColor);
+                        frameCount = 0;
                     }
                 }
                 {
@@ -528,7 +550,7 @@ void RenderLoo::gbufferPass() {
 
     m_gbufferfb.enableAttachments({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
                                    GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3,
-                                   GL_COLOR_ATTACHMENT4});
+                                   GL_COLOR_ATTACHMENT4, GL_COLOR_ATTACHMENT5});
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_GREATER);
@@ -615,6 +637,13 @@ const loo::Texture2D& RenderLoo::smaaPass(const loo::Texture2D& input) {
     return input;
 }
 
+const loo::Texture2D& RenderLoo::taaPass(const loo::Texture2D& input) {
+    if (m_antialiasmethod == AntiAliasMethod::TAA) {
+        return m_taa.apply(input, *m_velocityTexture, *m_gbuffers.depthStencil);
+    }
+    return input;
+}
+
 void RenderLoo::scene(loo::ShaderProgram& shader, RenderFlag flag) {
     shader.use();
 
@@ -632,7 +661,8 @@ void RenderLoo::scene(loo::ShaderProgram& shader, RenderFlag flag) {
                 glCullFace(GL_BACK);
             }
 
-            drawMesh(*mesh, m_scene.getModelMatrix(), m_baseshader);
+            drawMesh(*mesh, m_scene.getModelMatrix(),
+                     m_scene.getPreviousModelMatrix(), m_baseshader);
         }
     }
     logPossibleGLError();
@@ -669,6 +699,14 @@ void RenderLoo::loop() {
     glViewport(0, 0, getWidth(), getHeight());
 
     {
+        // update render info
+        ShaderProgram::getUniformBlock(SHADER_UB_PORT_RENDER_INFO)
+            .mapBufferScoped<RenderInfo>([this](RenderInfo& info) {
+                info.deviceSize = glm::vec2(getWidth(), getHeight());
+                info.frameCount = frameCount;
+                info.timeSecs = getFrameTimeFromStart();
+                info.enableTAA = m_antialiasmethod == AntiAliasMethod::TAA;
+            });
         animation();
 
         // setup camera shader uniform block
@@ -692,15 +730,25 @@ void RenderLoo::loop() {
         m_transparentPass.render(m_scene, m_skybox, *m_mainCamera,
                                  m_shadowMapPass.getDirectionalShadowMap(),
                                  m_enableDFGCompensation);
-        if (m_enableBloom)
-            m_bloomPass.render(*m_deferredResult);
+        const Texture2D& taaResult = taaPass(*m_deferredResult);
 
-        const Texture2D& texture = smaaPass(*m_deferredResult);
+        const Texture2D& bloomResult =
+            m_enableBloom ? m_bloomPass.render(taaResult) : taaResult;
+
+        const Texture2D& smaaResult = smaaPass(bloomResult);
 
         if (m_debugOutputPass.debugOutputOption == DebugOutputOption::None)
-            finalScreenPass(texture);
+            finalScreenPass(smaaResult);
         else
             m_debugOutputPass.render(m_gbuffers, getAOTexture());
+
+        // update previous frame MVP
+        ShaderProgram::getUniformBlock(SHADER_UB_PORT_PREVIOUS_FRAME_MVP)
+            .mapBufferScoped<MVP>([this](MVP& mvp) {
+                m_mainCamera->getViewMatrix(mvp.view);
+                m_mainCamera->getProjectionMatrix(mvp.projection, true);
+            });
+        m_scene.savePreviousTransform();
     }
 
     keyboard();

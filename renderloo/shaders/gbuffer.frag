@@ -9,6 +9,8 @@ layout(location = 2) in vec2 vTexCoord;
 // tangent space -> world space
 layout(location = 3) in vec3 vTangent;
 layout(location = 4) in vec3 vBitangent;
+layout(location = 5) in vec4 vScreenCoord;
+layout(location = 6) in vec4 vPrevScreenCoord;
 
 layout(location = 0) out vec4 FragPosition;
 // base color(3) + unused(1)
@@ -19,6 +21,7 @@ layout(location = 2) out vec4 GBufferB;
 layout(location = 3) out vec4 GBufferC;
 // emissive(3) + padding(1)
 layout(location = 4) out vec4 GBufferD;
+layout(location = 5) out vec2 FragVelocity;
 
 uniform vec3 uCameraPosition;
 uniform bool enableNormal;
@@ -102,6 +105,9 @@ void main() {
     sNormal = normalize(enableNormal ? sNormal : vNormal);
     FragPosition = vec4(vPos, 1);
     GBufferC.rgb = sNormal;
+    FragVelocity = (vScreenCoord.xy / vScreenCoord.w -
+                    vPrevScreenCoord.xy / vPrevScreenCoord.w) *
+                   0.5;
 #ifdef MATERIAL_PBR
     GBufferFromPBRMaterial(texCoord, baseColorTex, occlusionTex, metallicTex,
                            roughnessTex, emissiveTex, material.baseColor.rgb,
