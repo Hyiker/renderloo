@@ -455,6 +455,13 @@ void RenderLoo::gui() {
                 ImGui::Checkbox("Enable DFG Compensation",
                                 &m_enableDFGCompensation);
                 ImGui::Checkbox("Bloom", &m_enableBloom);
+                if (m_enableBloom) {
+                    int range = m_bloomPass.getBloomRange();
+                    if (ImGui::SliderInt("Bloom Range", &range, 1,
+                                         m_bloomPass.getMaxBloomRange())) {
+                        m_bloomPass.setBloomRange(range);
+                    }
+                }
                 const char* debugOutputItems[7] = {
                     "None",   "Base Color", "Metalness", "Roughness",
                     "Normal", "Emission",   "AO"};
@@ -469,8 +476,8 @@ void RenderLoo::gui() {
                                 static_cast<DebugOutputOption>(i);
                         }
                     }
+                    ImGui::TreePop();
                 }
-                ImGui::TreePop();
                 const char* antialiasmethod[] = {"None", "SMAA", "TAA"};
                 ImGui::Combo("Antialias", (int*)(&m_antialiasmethod),
                              antialiasmethod, IM_ARRAYSIZE(antialiasmethod));

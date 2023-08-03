@@ -13,16 +13,30 @@ BloomPass::BloomPass()
       m_additiveBlendingShader{
           Shader(BLOOMADDITIVEBLENDING_COMP, ShaderType::Compute)} {}
 
-constexpr int GROUP_SIZE = 16, MIPMAP_LAYER_MAX = 6;
+constexpr int GROUP_SIZE = 16;
 void BloomPass::init(int width, int height) {
     // base level starting from 1/2
     width /= 2;
     height /= 2;
     m_width = width;
     m_height = height;
-    m_downSample = std::make_unique<loo::Texture2D>();
+    setBloomRange(m_mipLevelDownSample);
+
+    m_result = std::make_unique<loo::Texture2D>();
+    m_result->init();
+    m_result->setupStorage(width * 2, height * 2, GL_RGBA32F, 1);
+    m_result->setSizeFilter(GL_LINEAR, GL_LINEAR);
+    m_result->setWrapFilter(GL_CLAMP_TO_EDGE);
+}
+int BloomPass::getMaxBloomRange() const {
+    return mipmapLevelFromSize(m_width, m_height);
+}
+int BloomPass::setBloomRange(int range) {
+    int width = m_width, height = m_height;
+    m_mipLevelDownSample = range;
     m_mipLevelDownSample =
-        std::min(mipmapLevelFromSize(width, height), MIPMAP_LAYER_MAX);
+        std::min(mipmapLevelFromSize(width, height), m_mipLevelDownSample);
+    m_downSample = std::make_unique<loo::Texture2D>();
     m_downSample->init();
     m_downSample->setupStorage(width, height, GL_RGBA32F, m_mipLevelDownSample);
     m_downSample->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
@@ -35,14 +49,8 @@ void BloomPass::init(int width, int height) {
                              std::max(m_mipLevelDownSample - 1, 1));
     m_upSample->setSizeFilter(GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR);
     m_upSample->setWrapFilter(GL_CLAMP_TO_EDGE);
-
-    m_result = std::make_unique<loo::Texture2D>();
-    m_result->init();
-    m_result->setupStorage(width * 2, height * 2, GL_RGBA32F, 1);
-    m_result->setSizeFilter(GL_LINEAR, GL_LINEAR);
-    m_result->setWrapFilter(GL_CLAMP_TO_EDGE);
+    return m_mipLevelDownSample;
 }
-
 const Texture2D& BloomPass::render(const Texture2D& input) {
     Application::beginEvent("Bloom Pass");
     // pick bright pixels, gaussian blur it into the mipmap level 0
