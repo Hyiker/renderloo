@@ -621,7 +621,7 @@ void RenderLoo::deferredPass() {
 
 void RenderLoo::aoPass() {
     if (m_aomethod == AOMethod::SSAO)
-        m_ssao.render(*this, *m_gbuffers.position, *m_gbuffers.bufferC,
+        m_ssao.render(*m_gbuffers.position, *m_gbuffers.bufferC,
                       *m_gbuffers.depthStencil);
     else if (m_aomethod == AOMethod::GTAO)
         m_gtao.render(*m_gbuffers.position, *m_gbuffers.bufferC,

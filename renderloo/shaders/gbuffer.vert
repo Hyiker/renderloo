@@ -3,6 +3,7 @@
 
 #include "include/constants.glsl"
 #include "include/renderInfo.glsl"
+#include "include/sampling.glsl"
 
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNormal;
@@ -38,11 +39,6 @@ layout(std140, binding = 5) uniform PrevMVPMatrices {
     mat4 prevNormalMatrix;
 };
 
-const vec2 Halton_2_3[8] = {
-    vec2(0.0f, -1.0f / 3.0f),        vec2(-1.0f / 2.0f, 1.0f / 3.0f),
-    vec2(1.0f / 2.0f, -7.0f / 9.0f), vec2(-3.0f / 4.0f, -1.0f / 9.0f),
-    vec2(1.0f / 4.0f, 5.0f / 9.0f),  vec2(-1.0f / 4.0f, -5.0f / 9.0f),
-    vec2(3.0f / 4.0f, 1.0f / 9.0f),  vec2(-7.0f / 8.0f, 7.0f / 9.0f)};
 void main() {
     mat3 model3 = mat3(model);
     vTexCoord = aTexCoord;

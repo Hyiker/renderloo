@@ -191,4 +191,10 @@ vec3 SampleHemisphereCosineWeighted(float i, float numSamples, out float pdf) {
     return vec3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
 }
 
+const vec2 Halton_2_3[8] = {
+    vec2(0.0f, -1.0f / 3.0f),        vec2(-1.0f / 2.0f, 1.0f / 3.0f),
+    vec2(1.0f / 2.0f, -7.0f / 9.0f), vec2(-3.0f / 4.0f, -1.0f / 9.0f),
+    vec2(1.0f / 4.0f, 5.0f / 9.0f),  vec2(-1.0f / 4.0f, -5.0f / 9.0f),
+    vec2(3.0f / 4.0f, 1.0f / 9.0f),  vec2(-7.0f / 8.0f, 7.0f / 9.0f)};
+
 #endif /* RENDERLOO_SHADERS_INCLUDE_SAMPLING_HPP */

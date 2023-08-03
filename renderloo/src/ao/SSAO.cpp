@@ -33,10 +33,10 @@ void SSAO::init() {
     m_blurSource->setWrapFilter(GL_CLAMP_TO_EDGE);
 }
 
-void SSAO::render(const loo::Application& app, const Texture2D& position,
-                  const Texture2D& normal, const Texture2D& depthStencil) {
-    app.beginEvent("SSAO");
-    app.beginEvent("Pass 1 - kernel sampling");
+void SSAO::render(const Texture2D& position, const Texture2D& normal,
+                  const Texture2D& depthStencil) {
+    Application::beginEvent("SSAO");
+    Application::beginEvent("Pass 1 - kernel sampling");
     m_fb.bind();
     m_fb.attachTexture(depthStencil, GL_STENCIL_ATTACHMENT, 0);
     m_fb.attachTexture(*m_blurSource, GL_COLOR_ATTACHMENT0, 0);
@@ -65,19 +65,19 @@ void SSAO::render(const loo::Application& app, const Texture2D& position,
     m_ssaoPass1Shader.setUniform("radius", radius);
     Quad::globalQuad().draw();
 
-    app.endEvent();
+    Application::endEvent();
 
-    app.beginEvent("Pass 2 - blur");
+    Application::beginEvent("Pass 2 - blur");
     m_ssaoPass2Shader.use();
     m_fb.attachTexture(*m_result, GL_COLOR_ATTACHMENT0, 0);
     glClear(GL_COLOR_BUFFER_BIT);
     m_ssaoPass2Shader.setTexture(0, *m_blurSource);
     Quad::globalQuad().draw();
-    app.endEvent();
+    Application::endEvent();
 
     glEnable(GL_DEPTH_TEST);
     glDisable(GL_STENCIL_TEST);
     // enable stencil write
     glStencilMask(0xFF);
-    app.endEvent();
+    Application::endEvent();
 }

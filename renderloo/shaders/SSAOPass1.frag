@@ -1,6 +1,8 @@
 #version 460 core
 #extension GL_GOOGLE_include_directive : enable
 #include "include/camera.glsl"
+#include "include/renderInfo.glsl"
+#include "include/sampling.glsl"
 
 in vec2 texCoord;
 
@@ -27,6 +29,7 @@ layout(std140, binding = 0) uniform MVPMatrices {
     mat4 projection;
     mat4 normalMatrix;
 };
+
 /**
 * SSAO overview:
 * 1. Sample random points in a hemisphere around the fragment(view space)
@@ -56,13 +59,20 @@ void main() {
     mat3 TBN = mat3(tangent, bitangent, normal);
 
     float occlusion = 0.0;
+    mat4 jitteredProjection = projection;
+    if (_RenderInfo.enableTAA != 0) {
+        vec2 jitter = Halton_2_3[_RenderInfo.frameCount % 8] /
+                      vec2(_RenderInfo.deviceSize) * 0.75;
+        jitteredProjection[2][0] += jitter.x;
+        jitteredProjection[2][1] += jitter.y;
+    }
     for (int i = 0; i < SSAO_KERNEL_SIZE; ++i) {
         // sample a position in view space
         vec3 samplePosVS = TBN * kernelSamples[i];
         samplePosVS = positionView.xyz + samplePosVS * SSAO_RADIUS;
         vec4 offset = vec4(samplePosVS, 1.0);
         // use uv coordinates of sampled position to sample the depth texture
-        offset = projection * offset;
+        offset = jitteredProjection * offset;
         offset.xy /= offset.w;
         offset.xy = offset.xy * 0.5 + 0.5;
         // sample the depth value of the sampled position

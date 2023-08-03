@@ -10,8 +10,7 @@ class SSAO {
    public:
     SSAO(int width, int height);
     void init();
-    void render(const loo::Application& app, const loo::Texture2D& position,
-                const loo::Texture2D& normal,
+    void render(const loo::Texture2D& position, const loo::Texture2D& normal,
                 const loo::Texture2D& depthStencil);
     const loo::Texture2D& getAOTexture() const { return *m_result; }
 
