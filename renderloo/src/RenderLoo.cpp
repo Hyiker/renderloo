@@ -123,7 +123,16 @@ static std::unique_ptr<loo::PerspectiveCamera> placeCameraBySceneAABB(
         return nullptr;
 }
 
+static void drop_callback(GLFWwindow* window, int count, const char** paths) {
+    auto myapp = static_cast<RenderLoo*>(glfwGetWindowUserPointer(window));
+    if (count > 0) {
+        for (int i = 0; i < count; ++i)
+            myapp->handleDrop(paths[i]);
+    }
+}
+
 void RenderLoo::loadModel(const std::string& filename) {
+    pauseTime();
     LOG(INFO) << "Loading model from " << filename << endl;
     m_scene.clear();
     auto meshes =
@@ -148,11 +157,36 @@ void RenderLoo::loadModel(const std::string& filename) {
     sceneAABB = m_scene.computeAABBWorldSpace();
     m_mainCamera = placeCameraBySceneAABB(sceneAABB, m_cameraMode);
     LOG(INFO) << "Load done" << endl;
-    frameCount = 0;
-}
 
+    convertMaterial();
+    frameCount = 0;
+    resumeTime();
+}
+std::vector<const char*> CommonModelExtensions{
+    ".gltf", ".glb",   ".obj", ".fbx", ".dae",
+    ".3ds",  ".blend", ".ase", ".ifc", ".fbx"};
+std::vector<const char*> CommonHDRIExtensions{".hdr", ".exr"};
+void RenderLoo::handleDrop(const string& path) {
+    fs::path fp(path);
+    for (auto& ext : CommonModelExtensions) {
+        if (fp.extension() == ext) {
+            loadModel(path);
+            return;
+        }
+    }
+    for (auto& ext : CommonHDRIExtensions) {
+        if (fp.extension() == ext) {
+            loadSkybox(path);
+            return;
+        }
+    }
+    LOG(ERROR) << "Unsupported file type: " << path << endl;
+}
 void RenderLoo::loadSkybox(const std::string& filename) {
+    pauseTime();
     m_skybox.loadTexture(filename);
+    frameCount = 0;
+    resumeTime();
 }
 
 RenderLoo::RenderLoo(int width, int height)
@@ -206,6 +240,7 @@ RenderLoo::RenderLoo(int width, int height)
     ShaderProgram::initUniformBlock(std::make_unique<UniformBuffer>(
         SHADER_UB_PORT_RENDER_INFO, sizeof(RenderInfo)));
 
+    glfwSetDropCallback(getWindow(), drop_callback);
     NFD_Init();
 }
 void RenderLoo::initGBuffers() {
@@ -463,10 +498,8 @@ void RenderLoo::gui() {
                         pauseTime();
                         popupFileSelector({{"HDR Image", "hdr,exr"}}, nullptr,
                                           [this](const string& outPath) {
-                                              m_skybox.loadTexture(outPath);
+                                              loadSkybox(outPath);
                                           });
-                        resumeTime();
-                        frameCount = 0;
                     }
                     static glm::vec3 skyboxColor = glm::vec3(1.f);
                     ImGui::ColorEdit3("", (float*)&skyboxColor,
@@ -484,14 +517,11 @@ void RenderLoo::gui() {
                         m_scene.modelName.size(), ImGuiInputTextFlags_ReadOnly);
                     ImGui::SameLine();
                     if (ImGui::Button("Load Model")) {
-                        pauseTime();
                         popupFileSelector({{"Model Files", "glb,gltf,obj,fbx"}},
                                           nullptr,
                                           [this](const string& outPath) {
                                               loadModel(outPath);
-                                              convertMaterial();
                                           });
-                        resumeTime();
                     }
                 }
             }

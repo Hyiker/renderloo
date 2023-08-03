@@ -46,6 +46,7 @@ struct RenderInfo {
 class RenderLoo : public loo::Application {
    public:
     RenderLoo(int width, int height);
+    void handleDrop(const std::string& paths);
     // only load model
     void loadModel(const std::string& filename);
     void loadSkybox(const std::string& filename);

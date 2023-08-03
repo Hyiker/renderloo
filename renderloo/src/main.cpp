@@ -32,7 +32,6 @@ void loadScene(RenderLoo& app, const char* filename) {
     fs::path p(filename);
     auto suffix = p.extension();
     app.loadModel(filename);
-    app.convertMaterial();
 }
 
 int main(int argc, char* argv[]) {

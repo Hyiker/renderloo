@@ -13,7 +13,7 @@ BloomPass::BloomPass()
       m_additiveBlendingShader{
           Shader(BLOOMADDITIVEBLENDING_COMP, ShaderType::Compute)} {}
 
-constexpr int GROUP_SIZE = 16, MIPMAP_LAYER_MAX = 3;
+constexpr int GROUP_SIZE = 16, MIPMAP_LAYER_MAX = 6;
 void BloomPass::init(int width, int height) {
     // base level starting from 1/2
     width /= 2;

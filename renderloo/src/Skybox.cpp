@@ -5,7 +5,6 @@
 #include <filesystem>
 #include <glm/gtc/matrix_transform.hpp>
 #include <unordered_map>
-#include "core/Transforms.hpp"
 #include "core/constants.hpp"
 #include "loo/Quad.hpp"
 #include "shaders/BRDFLUT.frag.hpp"
@@ -20,33 +19,6 @@
 using namespace loo;
 namespace fs = std::filesystem;
 using namespace std;
-
-static shared_ptr<Texture2D> createTexture2DFromHDRFile(
-    const std::string& filename) {
-
-    shared_ptr<Texture2D> tex = make_shared<Texture2D>();
-    int width, height, nchannel;
-    stbi_set_flip_vertically_on_load(true);
-    auto data = stbi_loadf(filename.c_str(), &width, &height, &nchannel, 3);
-    CHECK_NOTNULL(data);
-    CHECK_EQ(nchannel, 3);
-    if (!data) {
-        return nullptr;
-    }
-    tex->init();
-    logPossibleGLError();
-    // attention, mismatch between internalformat and format may casue
-    // GL_INVALID_OPERATION
-    tex->setup(data, width, height, GL_RGB16F, GL_RGB, GL_FLOAT);
-    panicPossibleGLError();
-    tex->setWrapFilter(GL_CLAMP_TO_EDGE);
-    tex->setSizeFilter(GL_LINEAR, GL_LINEAR);
-    panicPossibleGLError();
-
-    stbi_image_free(data);
-    LOG(INFO) << "2D HDR Texture " << filename << " loaded.";
-    return tex;
-}
 
 static constexpr int ENVMAP_SIZE = 1024, DIFFUSECONV_SIZE = 32,
                      SPECULARCONV_SIZE = 256, SPECULARCONV_MIPLEVEL = 5,
@@ -253,6 +225,10 @@ void Skybox::loadTexture(const std::string& path) {
     } else {
         // compute cubemap from equirectangular map
         auto equiMap = createTexture2DFromHDRFile(path);
+        if (!equiMap) {
+            LOG(ERROR) << "Failed to load equirectangular map " << path << endl;
+            return;
+        }
         m_envmap = make_unique<TextureCubeMap>();
         m_envmap->init();
         m_envmap->setupStorage(ENVMAP_SIZE, ENVMAP_SIZE, GL_RGB16F, -1);
