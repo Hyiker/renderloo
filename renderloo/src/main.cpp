@@ -43,6 +43,11 @@ int main(int argc, char* argv[]) {
         .help(
             "Skybox directory, name the six faces as "
             "[front|back|left|right|top|bottom].jpg");
+    program.add_argument("-s", "--size")
+        .help("Window size")
+        .nargs(2)
+        .default_value(vector<int>{1600, 1600})
+        .scan<'i', int>();
 
     try {
         program.parse_args(argc, argv);
@@ -61,8 +66,8 @@ int main(int argc, char* argv[]) {
     if (auto path = program.present<string>("-b")) {
         skyboxDir = *path;
     }
-
-    RenderLoo app(1600, 1600);
+    auto size = program.get<vector<int>>("-s");
+    RenderLoo app(size[0], size[1]);
     loadScene(app, modelPath.c_str());
     if (!skyboxDir.empty()) {
         app.loadSkybox(skyboxDir);
