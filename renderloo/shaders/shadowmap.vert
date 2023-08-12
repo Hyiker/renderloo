@@ -34,9 +34,9 @@ void main() {
         boneMatrix += aWeights[i] * bones[aBoneIDs[i]];
     }
     if (influenceCount == 0) {
-        boneMatrix = mat4(1.0);
+        boneMatrix = model;
     }
-    vec3 vPos = (model * boneMatrix * vec4(aPos, 1.0)).xyz;
+    vec3 vPos = (boneMatrix * vec4(aPos, 1.0)).xyz;
     vTexCoord = aTexCoord;
     gl_Position = lightSpaceMatrix * vec4(vPos, 1.0);
 }

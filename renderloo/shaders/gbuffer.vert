@@ -56,15 +56,15 @@ void main() {
         boneMatrix += aWeights[i] * bones[aBoneIDs[i]];
     }
     if (influenceCount == 0) {
-        boneMatrix = mat4(1.0);
+        boneMatrix = model;
     }
     vec4 normalWS = vec4(aNormal, 0.0);
     normalWS = boneMatrix * normalWS;
     vNormal = normalize((normalMatrix * normalWS).xyz);
-    vPos = (model * boneMatrix * vec4(aPos, 1.0)).xyz;
+    vPos = (boneMatrix * vec4(aPos, 1.0)).xyz;
     vec3 vPrevPos = (prevModel * boneMatrix * vec4(aPos, 1.0)).xyz;
-    vTangent = normalize((model * boneMatrix * vec4(aTangent, 0.0)).xyz);
-    vBitangent = normalize((model * boneMatrix * vec4(aBitangent, 0.0)).xyz);
+    vTangent = normalize((boneMatrix * vec4(aTangent, 0.0)).xyz);
+    vBitangent = normalize((boneMatrix * vec4(aBitangent, 0.0)).xyz);
     vec4 vView = view * vec4(vPos, 1.0);
     vScreenCoord = projection * vView;
     // ignore bone influence for prevScreenCoord for now

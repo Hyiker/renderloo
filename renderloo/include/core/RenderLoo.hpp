@@ -118,7 +118,7 @@ class RenderLoo : public loo::Application {
     TransparentPass m_transparentPass;
     BloomPass m_bloomPass;
     // antialias
-    AntiAliasMethod m_antialiasmethod{AntiAliasMethod::TAA};
+    AntiAliasMethod m_antialiasmethod{AntiAliasMethod::SMAA};
     SMAA m_smaa;
     TAA m_taa;
 

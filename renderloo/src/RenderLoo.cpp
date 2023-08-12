@@ -134,18 +134,7 @@ static void drop_callback(GLFWwindow* window, int count, const char** paths) {
 void RenderLoo::loadModel(const std::string& filename) {
     pauseTime();
     LOG(INFO) << "Loading model from " << filename << endl;
-    m_scene.clear();
-    auto meshes =
-        createMeshesFromFile(m_scene.boneMap, m_scene.boneMatrices, &m_animator,
-                             filename, m_scene.modelName);
-    m_scene.addMeshes(std::move(meshes));
-    if (m_scene.modelName.empty()) {
-        fs::path p(filename);
-        // filename without extension
-        m_scene.modelName = p.stem().string();
-    }
-
-    m_scene.prepare();
+    m_scene = createSceneFromFile(filename);
     AABB sceneAABB = m_scene.computeAABBWorldSpace();
     glm::vec3 diagonal = sceneAABB.getDiagonal();
     LOG(INFO) << "diagnal: " << glm::to_string(diagonal) << endl;
@@ -158,6 +147,7 @@ void RenderLoo::loadModel(const std::string& filename) {
     m_mainCamera = placeCameraBySceneAABB(sceneAABB, m_cameraMode);
     LOG(INFO) << "Load done" << endl;
 
+    m_animator.resetAnimation(m_scene.animation);
     convertMaterial();
     frameCount = 0;
     resumeTime();

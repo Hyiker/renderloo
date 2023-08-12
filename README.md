@@ -35,6 +35,7 @@ This is my OpenGL realtime rendering lab based on [loo](https://github.com/Hyike
     - [x] Original
     - [x] GTAO(partially done, lack correction and optimization)
   - [x] Physically based blooming
+- [ ] Skeletal Animation
 
 ## Gallery
 
